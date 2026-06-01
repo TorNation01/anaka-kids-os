@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Anaka Kids — Parent Dashboard</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; min-height: 100%; font-family: 'Segoe UI', system-ui, sans-serif; background: #0f1520; color: #fff; }
+:root { --bg: #0f1520; --surface: #1a2235; --surface2: #242f45; --accent: #6C63FF; --accent2: #FF6B9D; --accent3: #45D6C0; --accent4: #FFB347; --radius: 16px; --radius-sm: 10px; }
+.container { max-width: 900px; margin: 0 auto; padding: 24px; }
+header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+header h1 { font-size: 1.5rem; font-weight: 700; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+header .sub { color: #a0aec0; font-size: 0.9rem; }
+.back-btn { padding: 8px 18px; border: none; border-radius: 30px; background: var(--surface); color: #fff; cursor: pointer; text-decoration: none; font-size: 0.9rem; transition: 0.2s; }
+.back-btn:hover { background: var(--surface2); }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.card { background: var(--surface); border-radius: var(--radius); padding: 20px; }
+.card.full { grid-column: 1 / -1; }
+.card h3 { font-size: 0.95rem; color: #a0aec0; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+.stat { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.stat:last-child { border-bottom: none; }
+.stat-lbl { color: #a0aec0; }
+.stat-val { font-weight: 700; }
+.stat-val.good { color: var(--accent3); }
+.stat-val.warn { color: var(--accent4); }
+.bar { height: 8px; background: var(--surface2); border-radius: 10px; overflow: hidden; margin: 6px 0; }
+.bar-fill { height: 100%; border-radius: 10px; transition: width 0.5s; }
+.skill-row { margin-bottom: 14px; }
+.skill-row:last-child { margin-bottom: 0; }
+.skill-header { display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 4px; }
+.skill-name { font-weight: 600; }
+.skill-xp { color: #a0aec0; }
+.setting-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.setting-row:last-child { border-bottom: none; }
+.setting-input { background: var(--surface2); border: 1px solid var(--surface2); border-radius: 8px; padding: 6px 12px; color: #fff; font-size: 0.9rem; width: 70px; text-align: center; }
+.setting-select { background: var(--surface2); border: 1px solid var(--surface2); border-radius: 8px; padding: 6px 12px; color: #fff; font-size: 0.85rem; }
+.toggle { width: 48px; height: 26px; border-radius: 13px; background: var(--surface2); cursor: pointer; position: relative; transition: 0.3s; }
+.toggle.on { background: var(--accent3); }
+.toggle .knob { width: 22px; height: 22px; border-radius: 50%; background: #fff; position: absolute; top: 2px; left: 2px; transition: 0.3s; }
+.toggle.on .knob { left: 24px; }
+.btn { padding: 10px 24px; border: none; border-radius: 30px; background: var(--accent); color: #fff; font-weight: 600; cursor: pointer; transition: 0.2s; margin-top: 12px; }
+.btn:hover { box-shadow: 0 0 20px rgba(108,99,255,0.3); }
+.btn-secondary { background: var(--surface2); color: #a0aec0; }
+.profile-select { background: var(--surface2); border: 1px solid var(--surface2); border-radius: 8px; padding: 8px 14px; color: #fff; font-size: 0.9rem; }
+.activity-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.85rem; }
+.activity-row:last-child { border-bottom: none; }
+.activity-name { color: var(--accent3); }
+.activity-xp { color: var(--accent4); }
+.activity-time { color: #a0aec0; }
+@media(max-width: 650px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="container">
+<header>
+  <a class="back-btn" href="/">← Back to Kids OS</a>
+  <h1>🔒 Parent Dashboard</h1>
+  <span class="sub" id="profile-name">Loading...</span>
+  <select class="profile-select" id="profile-select" onchange="switchProfile()" style="margin-left:auto;"></select>
+</header>
+
+<div class="grid" id="dashboard-grid">
+  <div class="card"><h3>⏱️ Loading...</h3><p>Fetching data...</p></div>
+</div>
+</div>
+
+<script>
+function api(p) { return fetch(p).then(r => r.json()); }
+
+function load() {
+  api('/api/profiles').then(profiles => {
+    const sel = document.getElementById('profile-select');
+    sel.innerHTML = profiles.map(p => `<option value="${p.id}">${p.name} ${p.avatar||'🐱'}</option>`).join('');
+    const params = new URLSearchParams(window.location.search);
+    const pid = params.get('profile') || profiles[0]?.id || 1;
+    sel.value = pid;
+    document.getElementById('profile-name').textContent = profiles.find(p => p.id == pid)?.name || '';
+    loadDashboard(pid);
+  });
+}
+
+function switchProfile() {
+  const pid = document.getElementById('profile-select').value;
+  window.history.replaceState(null, '', '?profile=' + pid);
+  loadDashboard(pid);
+}
+
+function loadDashboard(pid) {
+  Promise.all([
+    api('/api/stats/' + pid),
+    api('/api/progress/' + pid),
+    api('/api/config'),
+    api('/api/history/' + pid + '?days=7')
+  ]).then(([stats, progress, config, history]) => {
+    const grid = document.getElementById('dashboard-grid');
+    const today = stats.today || { total_time: 0, total_xp: 0 };
+    const mins = Math.floor(today.total_time / 60);
+    const secs = today.total_time % 60;
+    const totalXp = progress.reduce((a, s) => a + (s.level - 1) * 100 + s.xp, 0);
+
+    let skillHtml = '';
+    progress.forEach(s => {
+      const pct = Math.min((s.xp / s.xp_to_next) * 100, 100);
+      const colors = { math: '#6C63FF', reading: '#FF6B9D', logic: '#45D6C0', creativity: '#FFB347', memory: '#FF8A65', typing: '#81D4FA' };
+      skillHtml += `<div class="skill-row"><div class="skill-header"><span class="skill-name">${s.skill}</span><span class="skill-xp">Lv.${s.level} (${s.xp}/${s.xp_to_next} XP)</span></div><div class="bar"><div class="bar-fill" style="width:${pct}%;background:${colors[s.skill.toLowerCase()]||'#6C63FF'}"></div></div></div>`;
+    });
+
+    let activityHtml = '';
+    const recent = stats.recent || [];
+    if (recent.length) {
+      recent.slice(0, 15).forEach(a => {
+        const d = new Date(a.timestamp);
+        activityHtml += `<div class="activity-row"><span class="activity-name">${a.activity}</span><span class="activity-time">${d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span><span class="activity-xp">+${a.xp_earned} XP</span></div>`;
+      });
+    } else {
+      activityHtml = '<div class="activity-row"><span style="color:#a0aec0;">No activity yet</span></div>';
+    }
+
+    let historyHtml = '';
+    if (history && history.length) {
+      history.forEach(h => {
+        historyHtml += `<div class="stat"><span class="stat-lbl">${h.day}</span><span class="stat-val good">${Math.floor(h.total_time/60)}m · ${h.total_xp} XP · ${h.activities} activities</span></div>`;
+      });
+    } else {
+      historyHtml = '<div class="stat"><span class="stat-lbl">No history for past 7 days</span></div>';
+    }
+
+    const limit = config?.screen_time_limit || 120;
+    const voice = config?.voice_enabled ?? 1;
+    const filter = config?.content_filter || 'all';
+
+    grid.innerHTML = `
+      <div class="card">
+        <h3>📊 Today</h3>
+        <div class="stat"><span class="stat-lbl">⏱️ Time</span><span class="stat-val">${mins}m ${secs}s</span></div>
+        <div class="stat"><span class="stat-lbl">⭐ XP Today</span><span class="stat-val good">${today.total_xp}</span></div>
+        <div class="stat"><span class="stat-lbl">🏆 Total XP</span><span class="stat-val">${totalXp}</span></div>
+      </div>
+      <div class="card">
+        <h3>📈 Skills</h3>
+        ${skillHtml}
+      </div>
+      <div class="card">
+        <h3>⚙️ Settings</h3>
+        <div class="setting-row">
+          <span class="stat-lbl">⏰ Daily Limit</span>
+          <div><input class="setting-input" id="s-limit" type="number" value="${limit}" min="15" max="360"> min</div>
+        </div>
+        <div class="setting-row">
+          <span class="stat-lbl">🎤 Voice Assistant</span>
+          <div class="toggle ${voice ? 'on' : ''}" id="s-voice" onclick="this.classList.toggle('on')"><div class="knob"></div></div>
+        </div>
+        <div class="setting-row">
+          <span class="stat-lbl">🎯 Content Level</span>
+          <select class="setting-select" id="s-filter">
+            <option value="easy" ${filter==='easy'?'selected':''}>Easy (Age 5)</option>
+            <option value="all" ${filter==='all'?'selected':''}>Medium (Age 6-7)</option>
+            <option value="advanced" ${filter==='advanced'?'selected':''}>Advanced (Age 8+)</option>
+          </select>
+        </div>
+        <button class="btn" onclick="saveSettings()">💾 Save Settings</button>
+      </div>
+      <div class="card">
+        <h3>🔄 Recent Activity</h3>
+        ${activityHtml}
+      </div>
+      <div class="card full">
+        <h3>📅 7-Day History</h3>
+        ${historyHtml}
+      </div>
+    `;
+  });
+}
+
+function saveSettings() {
+  const body = {
+    screen_time_limit: parseInt(document.getElementById('s-limit').value) || 120,
+    voice_enabled: document.getElementById('s-voice').classList.contains('on') ? 1 : 0,
+    content_filter: document.getElementById('s-filter').value
+  };
+  fetch('/api/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  }).then(() => { alert('✅ Settings saved!'); });
+}
+
+load();
+</script>
+</body>
+</html>
