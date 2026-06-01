@@ -83,6 +83,16 @@ db.exec(`
     completed INTEGER DEFAULT 0,
     completed_at TEXT
   );
+  CREATE TABLE IF NOT EXISTS difficulty_state (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id INTEGER,
+    skill TEXT,
+    difficulty INTEGER DEFAULT 1,
+    streak INTEGER DEFAULT 0,
+    total_attempts INTEGER DEFAULT 0,
+    total_correct INTEGER DEFAULT 0,
+    UNIQUE(profile_id, skill)
+  );
 `);
 
 // Seed default profile if empty
@@ -164,6 +174,39 @@ app.post('/api/config', (req, res) => {
   res.json({ success: true });
 });
 
+// ═══════ PROFILE UPDATE API ═══════
+app.put('/api/profile/update', (req, res) => {
+  const { profile_id, name, avatar, birth_year } = req.body;
+  db.prepare('UPDATE profiles SET name = COALESCE(?, name), avatar = COALESCE(?, avatar), birth_year = COALESCE(?, birth_year) WHERE id = ?')
+    .run(name, avatar, birth_year, profile_id);
+  res.json({ success: true });
+});
+
+// ═══════ ML STORY GENERATOR API ═══════
+app.post('/api/story/generate', async (req, res) => {
+  const { theme } = req.body || {};
+  try {
+    const llmResp = await fetch('https://llm.anakatech.llc/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer sk-ana...2026' },
+      body: JSON.stringify({
+        model: 'deepseek-v4-flash',
+        messages: [
+          { role: 'system', content: 'You are a children\'s story writer. Write a short story for a 5-year-old child. The story must be exactly 3-4 paragraphs, use simple words, have a kind message, and include animal characters or friendly creatures. Use emojis in the title. Respond ONLY with the story text, no preamble.' },
+          { role: 'user', content: theme ? `Write a story about ${theme}` : 'Write a story about a friendly dragon who loves to dance' }
+        ],
+        max_tokens: 500,
+        temperature: 0.8
+      })
+    });
+    const data = await llmResp.json();
+    const story = data.choices?.[0]?.message?.content || 'Once upon a time, in a land of imagination, a little star named Astra danced across the sky and made all the children smile. The end! 🌟';
+    res.json({ story });
+  } catch (e) {
+    res.json({ story: 'Once upon a time, a little cloud named Fluffy floated over a rainbow. All the animals looked up and smiled. The end! 🌈' });
+  }
+});
+
 app.get('/api/leaderboard/:profileId', (req, res) => {
   const leaderboard = db.prepare(`
     SELECT p.name, p.avatar, sk.skill, sk.level, sk.xp, sk.xp_to_next
@@ -175,7 +218,55 @@ app.get('/api/leaderboard/:profileId', (req, res) => {
   res.json(leaderboard);
 });
 
-// History activity log for parent dashboard
+// ═══════ ADAPTIVE DIFFICULTY API ═══════
+app.get('/api/difficulty/:profileId', (req, res) => {
+  const diffs = db.prepare('SELECT * FROM difficulty_state WHERE profile_id = ?').all(req.params.profileId);
+  // Seed if empty
+  if (diffs.length === 0) {
+    const skills = ['Math', 'Reading', 'Logic', 'Creativity', 'Memory', 'Typing'];
+    const ins = db.prepare('INSERT OR IGNORE INTO difficulty_state (profile_id, skill, difficulty, streak, total_attempts, total_correct) VALUES (?, ?, 1, 0, 0, 0)');
+    skills.forEach(s => ins.run(req.params.profileId, s));
+    const seeded = db.prepare('SELECT * FROM difficulty_state WHERE profile_id = ?').all(req.params.profileId);
+    return res.json(seeded);
+  }
+  res.json(diffs);
+});
+
+app.post('/api/difficulty/update', (req, res) => {
+  const { profile_id, skill, correct } = req.body;
+  if (!profile_id || !skill) return res.status(400).json({ error: 'Missing params' });
+
+  // Ensure row exists
+  db.prepare('INSERT OR IGNORE INTO difficulty_state (profile_id, skill, difficulty, streak, total_attempts, total_correct) VALUES (?, ?, 1, 0, 0, 0)').run(profile_id, skill);
+
+  const state = db.prepare('SELECT * FROM difficulty_state WHERE profile_id = ? AND skill = ?').get(profile_id, skill);
+  if (!state) return res.status(404).json({ error: 'Not found' });
+
+  let newStreak = correct ? state.streak + 1 : 0;
+  let newDifficulty = state.difficulty;
+  let newCorrect = state.total_correct + (correct ? 1 : 0);
+  let newAttempts = state.total_attempts + 1;
+
+  // Adjust difficulty based on streak
+  if (newStreak >= 5 && newDifficulty < 5) {
+    newDifficulty = Math.min(5, state.difficulty + 1);
+  } else if (newStreak === 0 && state.difficulty > 1 && state.total_attempts > 5) {
+    // Drop difficulty if wrong and have some history
+    newDifficulty = Math.max(1, state.difficulty - 1);
+  }
+
+  db.prepare('UPDATE difficulty_state SET streak = ?, difficulty = ?, total_attempts = ?, total_correct = ? WHERE id = ?')
+    .run(newStreak, newDifficulty, newAttempts, newCorrect, state.id);
+
+  res.json({
+    difficulty: newDifficulty,
+    streak: newStreak,
+    total_attempts: newAttempts,
+    total_correct: newCorrect,
+    accuracy: Math.round((newCorrect / newAttempts) * 100)
+  });
+});
+
 app.get('/api/history/:profileId', (req, res) => {
   const days = req.query.days || 7;
   const history = db.prepare(`

@@ -1,0 +1,27 @@
+[Unit]
+Description=Anaka Kids OS — Kiosk Mode
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=anakid
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/anakid/.Xauthority
+ExecStartPre=/usr/bin/xinit -- :0 vt1 -keeptty
+ExecStart=/usr/bin/chromium-browser \
+  --kiosk \
+  --no-first-run \
+  --disable-features=Translate \
+  --noerrdialogs \
+  --disable-infobars \
+  --disable-session-crashed-bubble \
+  --disable-pinch \
+  --overscroll-history-navigation=0 \
+  --disable-features=TouchpadOverscrollHistoryNavigation \
+  https://kids.anakatech.llc
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

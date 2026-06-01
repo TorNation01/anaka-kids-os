@@ -2,7 +2,7 @@
 
 A child-safe, gamified Linux operating system for ages 5-10. Built by **Anakatech** for Magnolia.
 
-> 🎯 **Phase 2 Complete** — 12 learning games, quest system, achievements, parent dashboard, voice navigation
+> 🎯 **Phase 4 Complete** — 12 learning games, quests, achievements, parent dashboard, voice, PWA, themes, ML stories, bootable images
 
 ---
 
@@ -125,19 +125,22 @@ anaka-kids-os/
 - LiteLLM voice integration
 - Learning path milestones
 
-### Phase 3 🔄 — Bootable Packaging (In Progress)
-- Raspberry Pi OS Lite image
-- Chromium kiosk mode
-- Read-only filesystem
-- First-boot WiFi wizard
-- Auto-update mechanism
+### Phase 3 ✅ — Bootable OS Image (Complete)
+- Raspberry Pi OS Lite + x86_64 Ubuntu support (`--arch rpi` / `--arch x64`)
+- Chromium kiosk mode with systemd service
+- Read-only root filesystem (child-proof)
+- First-boot WiFi and kiosk setup via rc.local
+- Auto-update check on boot and nightly at 3am
+- Bootable USB/SD card with `dd`
+- Systemd service template at `systemd/anaka-kiosk.service`
 
-### Phase 4 🔮 — Future
-- Adaptive difficulty engine
-- ML-powered content generation
-- Multi-child sync between devices
-- Customizable avatars and themes
-- Mobile companion app for parents
+### Phase 4 ✅ — PWA, Themes & AI (Complete)
+- **Adaptive difficulty engine** — 5-level difficulty per skill, streak tracking, accuracy-based adjustment
+- **Avatar customization** — 20 emoji avatars, name editing, birth year selector
+- **Theme system** — 4 kid themes (Ocean, Sunset, Forest, Space), persisted in localStorage
+- **ML story generator** — Calls LiteLLM (DeepSeek V4) to generate custom bedtime stories
+- **PWA support** — manifest.json, service worker, installable on tablets/phones
+- **LiteLLM voice** — Natural language commands fallback to LLM for complex requests
 
 ---
 

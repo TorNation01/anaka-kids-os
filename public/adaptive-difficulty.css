@@ -1,0 +1,9 @@
+/* ═══════ PHASE 4a: ADAPTIVE DIFFICULTY ENGINE ═══════ */
+/* Difficulty indicator stars */
+.difficulty-badge { display: flex; align-items: center; gap: 4px; font-size: 1rem; margin-left: 12px; }
+.difficulty-badge .star { color: var(--accent4); font-size: 1.1rem; }
+.difficulty-badge .star.empty { opacity: 0.2; }
+
+/* Streak indicator */
+.streak-badge { background: linear-gradient(135deg, var(--accent4), var(--accent2)); color: #1a1a2e; padding: 4px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; display: none; margin-left: 8px; }
+.streak-badge.show { display: inline-flex; align-items: center; gap: 4px; }

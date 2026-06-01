@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<link rel="manifest" href="/manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Anaka Kids OS</title>
 <style>
 /* ═══════ RESET & BASE ═══════ */
@@ -35,6 +38,22 @@ html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Segoe UI
   --fs-small: 0.9rem;
   --tile-w: clamp(140px, 16vw, 180px);
   --tile-icon: clamp(3.2rem, 6vw, 4.2rem);
+  --difficulty-1: #45D6C0;
+  --difficulty-2: #6C63FF;
+  --difficulty-3: #FFB347;
+  --difficulty-4: #FF6B9D;
+  --difficulty-5: #FF3366;
+}
+/* ═══════ ADAPTIVE DIFFICULTY ═══════ */
+.difficulty-bar { display: flex; gap: 4px; margin: 4px 0; justify-content: center; }
+.diff-dot { width: 12px; height: 12px; border-radius: 50%; background: #333; transition: all 0.3s; }
+.diff-dot.active { background: var(--accent3); box-shadow: 0 0 8px rgba(69,214,192,0.5); }
+.diff-dot.active.d2 { background: var(--accent); box-shadow: 0 0 8px rgba(108,99,255,0.5); }
+.diff-dot.active.d3 { background: var(--accent4); box-shadow: 0 0 8px rgba(255,179,71,0.5); }
+.diff-dot.active.d4 { background: var(--accent2); box-shadow: 0 0 8px rgba(255,107,157,0.5); }
+.diff-dot.active.d5 { background: #FF3366; box-shadow: 0 0 12px rgba(255,51,102,0.6); }
+.streak-badge { position: absolute; top: -4px; right: -4px; background: var(--accent4); color: #1a1a2e; border-radius: 12px; padding: 2px 8px; font-size: 0.7rem; font-weight: 700; display: none; z-index: 5; }
+.streak-badge.show { display: block; }
 }
 
 /* ═══════ FLOATING BACKDROP ═══════ */
@@ -348,6 +367,18 @@ html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Segoe UI
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 3px; }
+
+/* ═══════ THEME PICKER ═══════ */
+.theme-overlay { position: fixed; inset: 0; z-index: 36; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; }
+.theme-overlay.show { display: flex; }
+.theme-panel { background: var(--surface); border-radius: var(--radius); padding: 28px; max-width: 420px; width: 90%; text-align: center; }
+.theme-panel-title { font-size: var(--fs-h3); font-weight: 700; margin-bottom: 20px; }
+.theme-options { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+.theme-circle { width: 72px; height: 72px; border-radius: 50%; cursor: pointer; border: 4px solid transparent; transition: all 0.3s; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 700; color: #fff; box-shadow: 0 4px 16px rgba(0,0,0,0.3); }
+.theme-circle:hover { transform: scale(1.12); border-color: #fff; }
+.theme-circle.active { border-color: var(--accent3); box-shadow: 0 0 20px rgba(69,214,192,0.4); }
+.theme-circle .t-label { font-size: 0.7rem; margin-top: 2px; opacity: 0.9; }
+.theme-circle .t-emoji { font-size: 1.3rem; }
 </style>
 </head>
 <body>
@@ -369,7 +400,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Segoe UI
   <div class="desktop-header">
     <div class="header-left">
       <div class="header-logo">🌟 Anaka</div>
-      <div class="header-profile" id="header-profile" onclick="showProfileScreen()">
+      <div class="header-profile" id="header-profile" onclick="showEditProfileModal()">
         <span class="avatar" id="hdr-avatar">🐱</span>
         <span class="pname" id="hdr-name">Magnolia</span>
       </div>
@@ -377,6 +408,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Segoe UI
     <div class="header-right">
       <div class="header-xp"><span class="star">⭐</span> <span id="hdr-total-xp">0</span> XP</div>
       <div class="header-clock" id="hdr-clock">12:00</div>
+      <button class="header-btn" onclick="toggleThemePicker()" title="Themes">🎨</button>
       <button class="header-btn quests-btn" onclick="showQuests()" title="Quests">🎯 <span class="quests-badge" id="quests-badge">!</span></button>
       <button class="header-btn" onclick="showParentDashboard()" title="Parents">🔒</button>
     </div>
@@ -419,17 +451,33 @@ html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Segoe UI
   <div class="quests-panel" id="quests-panel"></div>
 </div>
 
-<!-- ═══════ NEW PROFILE MODAL ═══════ -->
+<!-- ═══════ PROFILE MODAL (Create & Edit) ═══════ -->
 <div class="modal-overlay" id="profile-modal">
   <div class="modal-box">
-    <h2>New Profile ✨</h2>
-    <input class="modal-input" id="new-name" placeholder="Child's name" maxlength="20">
+    <h2 id="profile-modal-title">New Profile ✨</h2>
+    <input class="modal-input" id="profile-name-input" placeholder="Child's name" maxlength="20">
     <div style="margin-bottom:8px;color:var(--text2);font-size:0.85rem;">Choose avatar:</div>
     <div class="avatar-grid" id="avatar-grid"></div>
+    <div style="margin-bottom:8px;color:var(--text2);font-size:0.85rem;margin-top:12px;">Birth year:</div>
+    <select class="modal-input" id="profile-birth-year" style="margin-bottom:16px;">
+      <option value="2019">2019 (Age 7)</option>
+      <option value="2020">2020 (Age 6)</option>
+      <option value="2021" selected>2021 (Age 5)</option>
+      <option value="2022">2022 (Age 4)</option>
+    </select>
     <div class="modal-actions">
       <button class="modal-btn secondary" onclick="closeProfileModal()">Cancel</button>
-      <button class="modal-btn primary" onclick="createProfile()">Create</button>
+      <button class="modal-btn primary" id="profile-create-btn" onclick="createProfile()">Create</button>
+      <button class="modal-btn primary" id="profile-save-btn" onclick="saveProfile()" style="display:none;">💾 Save Profile</button>
     </div>
+  </div>
+</div>
+
+<!-- ═══════ THEME PICKER ═══════ -->
+<div class="theme-overlay" id="theme-overlay" onclick="if(event.target===this)closeThemePicker()">
+  <div class="theme-panel" id="theme-panel">
+    <div class="theme-panel-title">🎨 Pick a Theme!</div>
+    <div class="theme-options" id="theme-options"></div>
   </div>
 </div>
 
@@ -443,6 +491,53 @@ html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Segoe UI
 /* ═══════ STATE ═══════ */
 var STATE = { profileId: 1, profileName: 'Magnolia', profileAvatar: '🐱', currentGame: null, dailyXp: 0, totalXp: 0, skills: {} };
 var GAMES = {};
+
+/* ═══════ ADAPTIVE DIFFICULTY ═══════ */
+var DIFF = { data: {}, loaded: false };
+function loadDifficulty(pid) {
+  if (!pid) return;
+  fetch('/api/difficulty/' + pid).then(function(r) { return r.json(); }).then(function(d) {
+    DIFF.data = {};
+    d.forEach(function(s) { DIFF.data[s.skill] = s; });
+    DIFF.loaded = true;
+    renderDiffBadges();
+  }).catch(function(e) { console.log('Diff load:', e); });
+}
+function submitResult(skill, correct) {
+  if (!DIFF.loaded) return Promise.resolve(null);
+  return fetch('/api/difficulty/update', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ profile_id: STATE.profileId, skill: skill, correct: correct })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (DIFF.data[skill]) { DIFF.data[skill] = d; }
+    renderDiffBadges();
+    return d;
+  }).catch(function(e) { console.log('Diff update:', e); return null; });
+}
+function getDifficulty(skill) { return DIFF.data[skill] ? DIFF.data[skill].difficulty : 1; }
+function getStreak(skill) { return DIFF.data[skill] ? DIFF.data[skill].streak : 0; }
+function getAccuracy(skill) { return DIFF.data[skill] ? DIFF.data[skill].accuracy : 0; }
+function renderDiffBadges() {
+  document.querySelectorAll('.tile-diff-badge').forEach(function(el) {
+    var skill = el.getAttribute('data-skill');
+    var diff = getDifficulty(skill);
+    var streak = getStreak(skill);
+    var html = '';
+    for (var i = 1; i <= 5; i++) { html += '<span class="diff-dot' + (i <= diff ? ' active d' + diff : '') + '"></span>'; }
+    el.innerHTML = html;
+    var sb = el.nextElementSibling;
+    if (sb && sb.classList.contains('streak-badge')) {
+      if (streak >= 3) { sb.textContent = '🔥' + streak; sb.classList.add('show'); }
+      else { sb.classList.remove('show'); }
+    }
+  });
+}
+function applyAdaptiveConfig(skill, configs) {
+  var diff = getDifficulty(skill);
+  var cfg = configs[diff] || configs[configs.length - 1] || {};
+  return cfg;
+}
+/* ═══════ END ADAPTIVE ═══════ */
 
 /* ═══════ BACKGROUND ANIMATION ═══════ */
 (function() {
@@ -512,6 +607,7 @@ function selectProfile(id, name, avatar) {
   document.getElementById('hdr-name').textContent = name;
   document.getElementById('profile-screen').classList.remove('active');
   document.getElementById('desktop-screen').classList.add('active');
+  loadDifficulty(id);
   loadProgress();
   loadApps();
 }
@@ -524,8 +620,12 @@ function showProfileScreen() {
 }
 
 /* ═══════ NEW PROFILE MODAL ═══════ */
-var AVATARS = ['🐱','🐶','🐰','🐼','🦊','🐸','🦄','🐲','🐧','🐙','🦋','🐢','🦁','🐯','🐮','🐷','🐨','🐥','🐝','🦀'];
+var AVATARS = ['🐱','🐶','🐰','🐼','🦊','🐸','🦋','🐢','🐙','🦁','🐯','🐮','🧚','🦄','🧜','🐧','🐷','🐨','🐥','🐝'];
 function showNewProfileModal() {
+  window._profileEditMode = false;
+  document.getElementById('profile-modal-title').textContent = 'New Profile ✨';
+  document.getElementById('profile-create-btn').style.display = '';
+  document.getElementById('profile-save-btn').style.display = 'none';
   var grid = document.getElementById('avatar-grid');
   grid.innerHTML = '';
   window._selectedAvatar = '🐱';
@@ -540,22 +640,75 @@ function showNewProfileModal() {
     };
     grid.appendChild(div);
   });
-  document.getElementById('new-name').value = '';
+  document.getElementById('profile-name-input').value = '';
+  document.getElementById('profile-birth-year').value = '2021';
+  document.getElementById('profile-modal').classList.add('show');
+}
+function showEditProfileModal() {
+  window._profileEditMode = true;
+  document.getElementById('profile-modal-title').textContent = 'Edit Profile ✏️';
+  document.getElementById('profile-create-btn').style.display = 'none';
+  document.getElementById('profile-save-btn').style.display = '';
+  var grid = document.getElementById('avatar-grid');
+  grid.innerHTML = '';
+  window._selectedAvatar = STATE.profileAvatar || '🐱';
+  AVATARS.forEach(function(a) {
+    var div = document.createElement('div');
+    div.className = 'avatar-option' + (a === window._selectedAvatar ? ' selected' : '');
+    div.textContent = a;
+    div.onclick = function() {
+      grid.querySelectorAll('.avatar-option').forEach(function(x) { x.classList.remove('selected'); });
+      div.classList.add('selected');
+      window._selectedAvatar = a;
+    };
+    grid.appendChild(div);
+  });
+  document.getElementById('profile-name-input').value = STATE.profileName || '';
+  // Try to figure out birth year from profile data or default
+  document.getElementById('profile-birth-year').value = '2021';
+  fetch('/api/profiles').then(function(r) { return r.json(); }).then(function(profiles) {
+    var p = profiles.filter(function(x) { return x.id === STATE.profileId; })[0];
+    if (p && p.birth_year) {
+      document.getElementById('profile-birth-year').value = String(p.birth_year);
+    }
+  });
   document.getElementById('profile-modal').classList.add('show');
 }
 function closeProfileModal() {
   document.getElementById('profile-modal').classList.remove('show');
 }
 function createProfile() {
-  var name = document.getElementById('new-name').value.trim();
+  var name = document.getElementById('profile-name-input').value.trim();
   if (!name) return;
   fetch('/api/profiles', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: name, avatar: window._selectedAvatar || '🐱', birth_year: 2021 })
+    body: JSON.stringify({ name: name, avatar: window._selectedAvatar || '🐱', birth_year: parseInt(document.getElementById('profile-birth-year').value) || 2021 })
   }).then(function() {
     closeProfileModal();
     loadProfiles();
+  });
+}
+function saveProfile() {
+  var name = document.getElementById('profile-name-input').value.trim();
+  if (!name) return;
+  fetch('/api/profile/update', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      profile_id: STATE.profileId,
+      name: name,
+      avatar: window._selectedAvatar || STATE.profileAvatar,
+      birth_year: parseInt(document.getElementById('profile-birth-year').value) || null
+    })
+  }).then(function() {
+    STATE.profileName = name;
+    STATE.profileAvatar = window._selectedAvatar || STATE.profileAvatar;
+    document.getElementById('hdr-avatar').textContent = STATE.profileAvatar;
+    document.getElementById('hdr-name').textContent = STATE.profileName;
+    closeProfileModal();
+    loadProfiles();
+    loadProgress();
   });
 }
 
@@ -583,23 +736,25 @@ function awardXp(skill, xp, activity, duration) {
       loadProgress();
       return r;
     }
+  }).then(function() {
+    return submitResult(skill, true);
   });
 }
 
 /* ═══════ APP DEFINITIONS ═══════ */
 var APPS = [
-  { id: 'shapes', icon: '🔷', label: 'Shape Match', game: 'shapes', cls: 'shapes', xp: 'Math', desc: 'Match the shapes together!' },
-  { id: 'counting', icon: '🔢', label: 'Counting', game: 'counting', cls: 'counting', xp: 'Math', desc: 'Count the objects!' },
-  { id: 'patterns', icon: '🧩', label: 'Patterns', game: 'patterns', cls: 'patterns', xp: 'Logic', desc: 'Find what comes next!' },
-  { id: 'memory', icon: '🧠', label: 'Memory', game: 'memory', cls: 'memory', xp: 'Memory', desc: 'Remember the cards!' },
-  { id: 'drawing', icon: '🎨', label: 'Art Studio', game: 'drawing', cls: 'drawing', xp: 'Creativity', desc: 'Draw anything you want!' },
-  { id: 'reading', icon: '📖', label: 'Story Time', game: 'reading', cls: 'reading', xp: 'Reading', desc: 'Read fun stories!' },
-  { id: 'typing', icon: '⌨️', label: 'Typing', game: 'typing', cls: 'typing', xp: 'Typing', desc: 'Learn to type!' },
-  { id: 'logic', icon: '🤔', label: 'Brain Teasers', game: 'logic', cls: 'logic', xp: 'Logic', desc: 'Solve fun puzzles!' },
-  { id: 'phonics', icon: '🔤', label: 'Phonics', game: 'phonics', cls: 'phonics', xp: 'Reading', desc: 'Learn letter sounds!' },
-  { id: 'colours', icon: '🌈', label: 'Colour Fun', game: 'colours', cls: 'colours', xp: 'Creativity', desc: 'Learn your colours!' },
-  { id: 'music', icon: '🎵', label: 'Music Maker', game: 'music', cls: 'music', xp: 'Creativity', desc: 'Make fun sounds!' },
-  { id: 'sorting', icon: '📦', label: 'Sort It Out', game: 'sorting', cls: 'sorting', xp: 'Logic', desc: 'Sort things by size!' },
+  { id: 'shapes', icon: '🔷', label: 'Shape Match', game: 'shapes', cls: 'shapes', skill: 'Math', xp: 'Math', desc: 'Match the shapes together!' },
+  { id: 'counting', icon: '🔢', label: 'Counting', game: 'counting', cls: 'counting', skill: 'Math', xp: 'Math', desc: 'Count the objects!' },
+  { id: 'patterns', icon: '🧩', label: 'Patterns', game: 'patterns', cls: 'patterns', skill: 'Logic', xp: 'Logic', desc: 'Find what comes next!' },
+  { id: 'memory', icon: '🧠', label: 'Memory', game: 'memory', cls: 'memory', skill: 'Memory', xp: 'Memory', desc: 'Remember the cards!' },
+  { id: 'drawing', icon: '🎨', label: 'Art Studio', game: 'drawing', cls: 'drawing', skill: 'Creativity', xp: 'Creativity', desc: 'Draw anything you want!' },
+  { id: 'reading', icon: '📖', label: 'Story Time', game: 'reading', cls: 'reading', skill: 'Reading', xp: 'Reading', desc: 'Read fun stories!' },
+  { id: 'typing', icon: '⌨️', label: 'Typing', game: 'typing', cls: 'typing', skill: 'Typing', xp: 'Typing', desc: 'Learn to type!' },
+  { id: 'logic', icon: '🤔', label: 'Brain Teasers', game: 'logic', cls: 'logic', skill: 'Logic', xp: 'Logic', desc: 'Solve fun puzzles!' },
+  { id: 'phonics', icon: '🔤', label: 'Phonics', game: 'phonics', cls: 'phonics', skill: 'Reading', xp: 'Reading', desc: 'Learn letter sounds!' },
+  { id: 'colours', icon: '🌈', label: 'Colour Fun', game: 'colours', cls: 'colours', skill: 'Creativity', xp: 'Creativity', desc: 'Learn your colours!' },
+  { id: 'music', icon: '🎵', label: 'Music Maker', game: 'music', cls: 'music', skill: 'Creativity', xp: 'Creativity', desc: 'Make fun sounds!' },
+  { id: 'sorting', icon: '📦', label: 'Sort It Out', game: 'sorting', cls: 'sorting', skill: 'Logic', xp: 'Logic', desc: 'Sort things by size!' },
 ];
 
 function loadApps() {
@@ -608,7 +763,7 @@ function loadApps() {
   APPS.forEach(function(a) {
     var tile = document.createElement('div');
     tile.className = 'app-tile ' + a.cls;
-    tile.innerHTML = '<div class="icon">' + a.icon + '</div><div class="label">' + a.label + '</div>';
+    tile.innerHTML = '<div class="icon">' + a.icon + '</div><div class="label">' + a.label + '</div><div class="tile-diff-badge" data-skill="' + a.skill + '"></div><div class="streak-badge"></div>';
     tile.onclick = function() { openGame(a); };
     grid.appendChild(tile);
   });
@@ -865,8 +1020,9 @@ GAMES.reading = { stories: [
   { title: 'The Brave Little Star', text: 'Once upon a time, there was a little star named Sparkle. Sparkle was the smallest star in the sky, but she dreamed of being the brightest. Every night, she tried to shine as hard as she could. "You are too small," said the other stars. But Sparkle kept shining. One night, a lost spaceship needed light to find its way home. Sparkle shone brighter than she ever had before. The spaceship saw her light and found its way home. Sparkle learned that even the smallest star can make a big difference.' },
   { title: 'Max the Curious Cat', text: 'Max was a curious orange cat who loved to explore. One day, he found a mysterious blue door in the garden. He pushed it open with his nose and found a world made of clouds. Everything was soft and fluffy. Max jumped from cloud to cloud, meeting a cloud dog and a cloud bird. They played together until the sun went down. Max went back through the blue door and told his friend Lily all about his adventure.' },
   { title: 'The Rainbow Garden', text: 'Mia loved colors. She planted seeds in her garden: red seeds, blue seeds, and yellow seeds. She watered them every day. First, red flowers bloomed — roses as red as strawberries. Then, blue flowers grew — bluebells that rang in the wind. Finally, yellow flowers appeared — sunflowers that followed the sun. Mia looked at her garden and saw that red, blue, and yellow made a beautiful rainbow of flowers. She smiled and picked a bouquet for her mother.' }
-], currentIdx: 0, init: function(area) {
+], currentIdx: 0, generatedStory: null, init: function(area) {
   var self = this;
+  this.generatedStory = null;
   var html = '<div class="reading-area">';
   html += '<select class="story-select" id="story-select">';
   this.stories.forEach(function(s, i) {
@@ -880,28 +1036,65 @@ GAMES.reading = { stories: [
   html += '<div class="story-controls">';
   html += '<button class="story-btn speak" onclick="GAMES.reading.speak()">🔊 Read to Me</button>';
   html += '<button class="story-btn" onclick="GAMES.reading.stopSpeak()">⏹ Stop</button>';
+  html += '<button class="story-btn" onclick="GAMES.reading.generateStory()" id="new-story-btn" style="background:var(--accent5);">✨ New Story</button>';
+  html += '<div id="story-spinner" style="display:none;margin-top:12px;font-size:1.2rem;color:var(--accent3);">✨ Creating a magical story...</div>';
   html += '</div></div>';
   area.innerHTML = html;
   var sel = document.getElementById('story-select');
   if (sel) sel.onchange = function() {
     self.currentIdx = parseInt(this.value);
+    self.generatedStory = null;
     self.showStory();
   };
 }, showStory: function() {
-  var story = this.stories[this.currentIdx];
-  var title = document.querySelector('.story-display .title');
-  var text = document.getElementById('story-text');
-  if (title) title.textContent = story.title;
-  if (text) {
-    var words = story.text.split(' ');
-    text.innerHTML = words.map(function(w) { return '<span class="word">' + w + '</span>'; }).join(' ');
+  var story = this.generatedStory || this.stories[this.currentIdx];
+  if (!story) return;
+  var titleEl = document.querySelector('.story-display .title');
+  var textEl = document.getElementById('story-text');
+  if (titleEl) titleEl.textContent = story.title || '✨ Magical Story';
+  if (textEl) {
+    var words = (story.text || story).split(' ');
+    textEl.innerHTML = words.map(function(w) { return '<span class="word">' + w + '</span>'; }).join(' ');
   }
+}, generateStory: function() {
+  var self = this;
+  var btn = document.getElementById('new-story-btn');
+  var spinner = document.getElementById('story-spinner');
+  if (btn) btn.style.display = 'none';
+  if (spinner) spinner.style.display = '';
+  fetch('/api/story/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ theme: '' })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    var storyText = data.story || 'Once upon a time...';
+    // Parse title from first line if it has emoji
+    var title = '✨ Magical Story';
+    var lines = storyText.split('\n').filter(function(l) { return l.trim(); });
+    if (lines.length > 0 && lines[0].length < 80) {
+      title = lines[0];
+      storyText = lines.slice(1).join(' ') || storyText;
+    }
+    self.generatedStory = { title: title, text: storyText };
+    self.showStory();
+    self.currentIdx = -1;
+    if (spinner) spinner.style.display = 'none';
+    if (btn) btn.style.display = '';
+    // Auto-read the story
+    setTimeout(function() { self.speak(); }, 500);
+  }).catch(function() {
+    self.generatedStory = { title: '🌟 Cloud Story', text: 'Once upon a time, a little cloud named Fluffy floated over a rainbow. All the animals looked up and smiled. The end! 🌈' };
+    self.showStory();
+    if (spinner) spinner.style.display = 'none';
+    if (btn) btn.style.display = '';
+  });
 }, speak: function() {
-  var story = this.stories[this.currentIdx];
+  var story = this.generatedStory || this.stories[this.currentIdx];
   if (!story) return;
   if (!window.speechSynthesis) return;
   window.speechSynthesis.cancel();
-  var utter = new SpeechSynthesisUtterance(story.text);
+  var text = story.text || story;
+  var utter = new SpeechSynthesisUtterance(text);
   utter.lang = 'en-US';
   utter.rate = 0.8;
   utter.pitch = 1.2;
@@ -1513,6 +1706,94 @@ function toggleVoice() {
     document.getElementById('voice-transcript').classList.remove('show');
     if (recognition) recognition.stop();
   }
+}
+
+/* ═══════ THEME SYSTEM ═══════ */
+var THEMES = {
+  ocean: {
+    '--bg': '#0a1628', '--surface': '#112240', '--surface2': '#1a3366',
+    '--accent': '#00B4D8', '--accent2': '#90E0EF', '--accent3': '#48CAE4',
+    '--accent4': '#FFD166', '--accent5': '#0077B6'
+  },
+  sunset: {
+    '--bg': '#1a0a14', '--surface': '#2d1520', '--surface2': '#3d2030',
+    '--accent': '#FF6B6B', '--accent2': '#FFB347', '--accent3': '#FFD93D',
+    '--accent4': '#FF8C42', '--accent5': '#C94F7C'
+  },
+  forest: {
+    '--bg': '#0a1a0a', '--surface': '#152815', '--surface2': '#1e3a1e',
+    '--accent': '#4CAF50', '--accent2': '#81C784', '--accent3': '#A5D6A7',
+    '--accent4': '#FFD54F', '--accent5': '#2E7D32'
+  },
+  space: {
+    '--bg': '#0a0a1a', '--surface': '#151530', '--surface2': '#202050',
+    '--accent': '#BB86FC', '--accent2': '#03DAC6', '--accent3': '#CF6679',
+    '--accent4': '#FF7597', '--accent5': '#3700B3'
+  }
+};
+
+var THEME_LABELS = {
+  ocean: { label: 'Ocean', emoji: '🌊', bg: 'linear-gradient(135deg, #0a1628, #0077B6)' },
+  sunset: { label: 'Sunset', emoji: '🌅', bg: 'linear-gradient(135deg, #1a0a14, #FF6B6B)' },
+  forest: { label: 'Forest', emoji: '🌿', bg: 'linear-gradient(135deg, #0a1a0a, #4CAF50)' },
+  space: { label: 'Space', emoji: '🚀', bg: 'linear-gradient(135deg, #0a0a1a, #BB86FC)' }
+};
+
+var _currentTheme = 'ocean';
+
+function applyTheme(themeName) {
+  var t = THEMES[themeName];
+  if (!t) return;
+  _currentTheme = themeName;
+  var root = document.documentElement;
+  Object.keys(t).forEach(function(key) {
+    root.style.setProperty(key, t[key]);
+  });
+  localStorage.setItem('anaka-theme', themeName);
+  // Update active state in picker
+  document.querySelectorAll('.theme-circle').forEach(function(c) {
+    c.classList.toggle('active', c.dataset.theme === themeName);
+  });
+}
+
+function toggleThemePicker() {
+  var overlay = document.getElementById('theme-overlay');
+  var options = document.getElementById('theme-options');
+  if (overlay.classList.contains('show')) {
+    overlay.classList.remove('show');
+    return;
+  }
+  options.innerHTML = '';
+  Object.keys(THEMES).forEach(function(key) {
+    var info = THEME_LABELS[key];
+    var div = document.createElement('div');
+    div.className = 'theme-circle' + (key === _currentTheme ? ' active' : '');
+    div.dataset.theme = key;
+    div.style.background = info.bg;
+    div.innerHTML = '<span class="t-emoji">' + info.emoji + '</span><span class="t-label">' + info.label + '</span>';
+    div.onclick = function() { applyTheme(key); };
+    options.appendChild(div);
+  });
+  overlay.classList.add('show');
+}
+
+function closeThemePicker() {
+  document.getElementById('theme-overlay').classList.remove('show');
+}
+
+// Restore saved theme on load
+(function() {
+  var saved = localStorage.getItem('anaka-theme');
+  if (saved && THEMES[saved]) {
+    applyTheme(saved);
+  }
+})();
+
+/* ═══════ SERVICE WORKER REGISTRATION ═══════ */
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(function(e) {
+    console.log('SW registration failed:', e);
+  });
 }
 
 /* ═══════ INIT ═══════ */
