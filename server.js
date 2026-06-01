@@ -46,6 +46,43 @@ db.exec(`
     content_filter TEXT DEFAULT 'all',
     password_hash TEXT DEFAULT ''
   );
+  CREATE TABLE IF NOT EXISTS quests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id INTEGER,
+    title TEXT NOT NULL,
+    description TEXT,
+    skill TEXT,
+    xp_reward INTEGER DEFAULT 50,
+    required_count INTEGER DEFAULT 1,
+    current_count INTEGER DEFAULT 0,
+    completed INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS achievements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id INTEGER,
+    name TEXT NOT NULL,
+    icon TEXT DEFAULT '🏆',
+    description TEXT,
+    unlocked_at TEXT
+  );
+  CREATE TABLE IF NOT EXISTS activity_queue (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id INTEGER,
+    type TEXT,
+    payload TEXT,
+    processed INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS learning_path (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id INTEGER,
+    milestone TEXT,
+    skill TEXT,
+    age_group TEXT DEFAULT '5',
+    completed INTEGER DEFAULT 0,
+    completed_at TEXT
+  );
 `);
 
 // Seed default profile if empty
@@ -157,6 +194,176 @@ app.get('/api/history/:profileId', (req, res) => {
 // Routes
 app.get('/parent', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'parent.html'));
+});
+
+// ═══════ QUESTS API ═══════
+app.get('/api/quests/:profileId', (req, res) => {
+  const active = db.prepare('SELECT * FROM quests WHERE profile_id = ? AND completed = 0 ORDER BY created_at DESC LIMIT 5').all(req.params.profileId);
+  const completed = db.prepare('SELECT * FROM quests WHERE profile_id = ? AND completed = 1 ORDER BY created_at DESC LIMIT 20').all(req.params.profileId);
+  res.json({ active, completed });
+});
+
+app.post('/api/quests/generate', (req, res) => {
+  const { profile_id } = req.body;
+  // Generate age-appropriate quests based on content_level
+  const profile = db.prepare('SELECT * FROM profiles WHERE id = ?').get(profile_id);
+  const level = profile ? profile.content_level : 1;
+  const questTemplates = [
+    { title: 'Shape Explorer', desc: 'Match 3 pairs of shapes', skill: 'Math', xp: 30, count: 3 },
+    { title: 'Counting Champion', desc: 'Count correctly 5 times', skill: 'Math', xp: 40, count: 5 },
+    { title: 'Pattern Detective', desc: 'Complete 3 patterns', skill: 'Logic', xp: 35, count: 3 },
+    { title: 'Memory Master', desc: 'Match all cards in memory game', skill: 'Memory', xp: 50, count: 1 },
+    { title: 'Story Explorer', desc: 'Read 2 stories', skill: 'Reading', xp: 30, count: 2 },
+    { title: 'Art Creator', desc: 'Make 2 drawings', skill: 'Creativity', xp: 25, count: 2 },
+    { title: 'Keyboard Hero', desc: 'Type 5 words correctly', skill: 'Typing', xp: 40, count: 5 },
+    { title: 'Brain Builder', desc: 'Solve 3 puzzles', skill: 'Logic', xp: 45, count: 3 },
+  ];
+  // Clear old uncompleted quests
+  db.prepare('DELETE FROM quests WHERE profile_id = ? AND completed = 0').run(profile_id);
+  // Assign 2-3 random quests
+  const shuffled = questTemplates.sort(() => Math.random() - 0.5).slice(0, 2 + level);
+  const insert = db.prepare('INSERT INTO quests (profile_id, title, description, skill, xp_reward, required_count) VALUES (?, ?, ?, ?, ?, ?)');
+  shuffled.forEach(q => insert.run(profile_id, q.title, q.desc, q.skill, q.xp, q.count));
+  const quests = db.prepare('SELECT * FROM quests WHERE profile_id = ? AND completed = 0').all(profile_id);
+  res.json(quests);
+});
+
+app.post('/api/quests/progress', (req, res) => {
+  const { profile_id, skill } = req.body;
+  const quest = db.prepare('SELECT * FROM quests WHERE profile_id = ? AND skill = ? AND completed = 0 LIMIT 1').get(profile_id, skill);
+  if (quest) {
+    const newCount = quest.current_count + 1;
+    if (newCount >= quest.required_count) {
+      // Complete quest
+      db.prepare('UPDATE quests SET current_count = ?, completed = 1 WHERE id = ?').run(newCount, quest.id);
+      // Award bonus XP + check achievements
+      const bonusXp = quest.xp_reward;
+      db.prepare('UPDATE progress SET xp = xp + ? WHERE profile_id = ? AND skill = ?').run(bonusXp, profile_id, skill);
+      db.prepare('INSERT INTO activity_log (profile_id, activity, duration_seconds, xp_earned) VALUES (?, ?, ?, ?)').run(profile_id, 'Quest: ' + quest.title, 0, bonusXp);
+      // Check for achievement
+      const completedCount = db.prepare('SELECT COUNT(*) as c FROM quests WHERE profile_id = ? AND completed = 1').get(profile_id).c;
+      if (completedCount === 1) {
+        const exists = db.prepare('SELECT id FROM achievements WHERE profile_id = ? AND name = ?').get(profile_id, 'First Quest');
+        if (!exists) db.prepare('INSERT INTO achievements (profile_id, name, icon, description, unlocked_at) VALUES (?, ?, ?, ?, datetime(\'now\'))').run(profile_id, 'First Quest', '🌟', 'Completed first quest!');
+      }
+      res.json({ completed: true, bonus: bonusXp, title: quest.title });
+    } else {
+      db.prepare('UPDATE quests SET current_count = ? WHERE id = ?').run(newCount, quest.id);
+      res.json({ completed: false, current: newCount, required: quest.required_count });
+    }
+  } else {
+    res.json({ noQuest: true });
+  }
+});
+
+// ═══════ ACHIEVEMENTS API ═══════
+app.get('/api/achievements/:profileId', (req, res) => {
+  const achievements = db.prepare('SELECT * FROM achievements WHERE profile_id = ? ORDER BY unlocked_at DESC').all(req.params.profileId);
+  res.json(achievements);
+});
+
+// ═══════ LEARNING PATH API ═══════
+app.get('/api/learning-path/:profileId', (req, res) => {
+  const milestones = db.prepare('SELECT * FROM learning_path WHERE profile_id = ? ORDER BY id').all(req.params.profileId);
+  if (milestones.length === 0) {
+    // Seed learning path for age 5
+    const seed = [
+      { milestone: 'Recognise Shapes', skill: 'Math', age: '5' },
+      { milestone: 'Count to 10', skill: 'Math', age: '5' },
+      { milestone: 'Letter Recognition', skill: 'Reading', age: '5' },
+      { milestone: 'Simple Patterns', skill: 'Logic', age: '5' },
+      { milestone: 'Colour Identification', skill: 'Creativity', age: '5' },
+      { milestone: 'Follow Instructions', skill: 'Logic', age: '5' },
+      { milestone: 'Use Mouse/Touch', skill: 'Typing', age: '5' },
+      { milestone: 'Match Pairs', skill: 'Memory', age: '5' },
+    ];
+    const ins = db.prepare('INSERT INTO learning_path (profile_id, milestone, skill, age_group) VALUES (?, ?, ?, ?)');
+    seed.forEach(m => ins.run(req.params.profileId, m.milestone, m.skill, m.age));
+    const seeded = db.prepare('SELECT * FROM learning_path WHERE profile_id = ? ORDER BY id').all(req.params.profileId);
+    res.json(seeded);
+  } else {
+    res.json(milestones);
+  }
+});
+
+app.post('/api/learning-path/complete', (req, res) => {
+  const { profile_id, milestone_id } = req.body;
+  db.prepare('UPDATE learning_path SET completed = 1, completed_at = datetime(\'now\') WHERE id = ? AND profile_id = ?').run(milestone_id, profile_id);
+  // Check if all milestones complete
+  const remaining = db.prepare('SELECT COUNT(*) as c FROM learning_path WHERE profile_id = ? AND completed = 0').get(profile_id).c;
+  if (remaining === 0) {
+    const exists = db.prepare('SELECT id FROM achievements WHERE profile_id = ? AND name = ?').get(profile_id, 'Ready for Age 6');
+    if (!exists) db.prepare('INSERT INTO achievements (profile_id, name, icon, description, unlocked_at) VALUES (?, ?, ?, ?, datetime(\'now\'))').run(profile_id, 'Ready for Age 6', '🎓', 'Completed all age 5 milestones!');
+  }
+  res.json({ success: true, remaining });
+});
+
+// ═══════ LITELLM VOICE API ═══════
+app.post('/api/voice/command', async (req, res) => {
+  const { text, profile_id } = req.body;
+  if (!text) return res.json({ action: null, response: '' });
+  
+  const cmd = text.toLowerCase().trim();
+  
+  // Parse natural language commands
+  if (cmd.includes('shape') || cmd.includes('match')) {
+    return res.json({ action: 'open_game', payload: 'shapes', response: 'Opening Shape Match! Let us find matching shapes together.' });
+  }
+  if (cmd.includes('count') || cmd.includes('number') || cmd.includes('how many')) {
+    return res.json({ action: 'open_game', payload: 'counting', response: 'Let us count some fun things!' });
+  }
+  if (cmd.includes('pattern') || cmd.includes('next')) {
+    return res.json({ action: 'open_game', payload: 'patterns', response: 'Time to find the pattern!' });
+  }
+  if (cmd.includes('memory') || cmd.includes('remember') || cmd.includes('card')) {
+    return res.json({ action: 'open_game', payload: 'memory', response: 'Can you remember where the cards are?' });
+  }
+  if (cmd.includes('draw') || cmd.includes('art') || cmd.includes('paint') || cmd.includes('colour') || cmd.includes('color')) {
+    return res.json({ action: 'open_game', payload: 'drawing', response: 'Time to create a masterpiece!' });
+  }
+  if (cmd.includes('story') || cmd.includes('read') || cmd.includes('book')) {
+    return res.json({ action: 'open_game', payload: 'reading', response: 'Let us read a wonderful story together!' });
+  }
+  if (cmd.includes('type') || cmd.includes('keyboard') || cmd.includes('word')) {
+    return res.json({ action: 'open_game', payload: 'typing', response: 'Let us practice some words!' });
+  }
+  if (cmd.includes('puzzle') || cmd.includes('brain') || cmd.includes('teaser') || cmd.includes('riddle')) {
+    return res.json({ action: 'open_game', payload: 'logic', response: 'Time for some brain teasers!' });
+  }
+  if (cmd.includes('home') || cmd.includes('back') || cmd.includes('desktop') || cmd.includes('menu')) {
+    return res.json({ action: 'go_home', payload: '', response: 'Going back to the home screen!' });
+  }
+  if (cmd.includes('parent') || cmd.includes('mummy') || cmd.includes('daddy') || cmd.includes('mum') || cmd.includes('dad')) {
+    return res.json({ action: 'open_parent', payload: '', response: 'Opening the parent dashboard!' });
+  }
+  if (cmd.includes('quest') || cmd.includes('mission') || cmd.includes('challenge')) {
+    return res.json({ action: 'show_quests', payload: '', response: 'Here are your quests!' });
+  }
+  if (cmd.includes('hello') || cmd.includes('hi') || cmd.includes('hey')) {
+    return res.json({ action: 'speak', payload: '', response: 'Hello! What do you want to play today?' });
+  }
+  
+  // LiteLLM integration for complex commands
+  try {
+    const llmResponse = await fetch('https://llm.anakatech.llc/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer sk-ana...2026' },
+      body: JSON.stringify({
+        model: 'deepseek-v4-flash',
+        messages: [
+          { role: 'system', content: 'You are Anaka, a friendly AI assistant for a 5-year-old child. Respond in a warm, simple, and encouraging way. Keep responses under 2 sentences. Use emojis. Never mention complex topics.' },
+          { role: 'user', content: cmd }
+        ],
+        max_tokens: 100
+      })
+    });
+    const data = await llmResponse.json();
+    const reply = data.choices?.[0]?.message?.content || 'I am not sure what you mean! Try saying "shapes" or "stories"!';
+    const action = (cmd.includes('play') || cmd.includes('game')) ? 'speak' : 'speak';
+    res.json({ action, payload: '', response: reply });
+  } catch (e) {
+    res.json({ action: 'speak', payload: '', response: 'I did not understand. Try saying shapes, counting, or stories!' });
+  }
 });
 
 app.get('*', (req, res) => {
