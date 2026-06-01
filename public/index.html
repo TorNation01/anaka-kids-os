@@ -84,6 +84,63 @@ html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Segoe UI
 .app-tile.memory { border-color: #FF8A65; }
 .app-tile.typing { border-color: #81D4FA; }
 .app-tile.logic { border-color: #A5D6A7; }
+.app-tile.phonics { border-color: #CE93D8; }
+.app-tile.colours { border-color: #FFAB91; }
+.app-tile.music { border-color: #F48FB1; }
+.app-tile.sorting { border-color: #80CBC4; }
+
+/* ═══════ NEW GAMES ═══════ */
+.phonics-area, .colours-area, .music-area, .sorting-area { max-width: 500px; width: 100%; text-align: center; }
+.phonics-card { width: 80px; height: 80px; border-radius: var(--radius-sm); display: inline-flex; align-items: center; justify-content: center; font-size: 2.2rem; background: var(--surface); border: 3px solid transparent; cursor: pointer; transition: 0.3s; margin: 6px; }
+.phonics-card:hover { border-color: var(--accent5); transform: scale(1.1); }
+.phonics-card.correct { border-color: var(--accent3); background: rgba(69,214,192,0.15); }
+.phonics-card.wrong { animation: shake 0.4s; border-color: var(--accent2); }
+.colour-swatch { width: 70px; height: 70px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; border: 3px solid transparent; transition: 0.3s; margin: 8px; font-size: 0; }
+.colour-swatch:hover { transform: scale(1.15); border-color: #fff; }
+.colour-swatch.correct { border-color: var(--accent3); box-shadow: 0 0 20px var(--accent3); }
+.colour-swatch.wrong { animation: shake 0.4s; border-color: var(--accent2); }
+.music-note { font-size: 3rem; cursor: pointer; transition: 0.2s; display: inline-block; margin: 8px; }
+.music-note:hover { transform: scale(1.2); }
+.music-note.playing { animation: bounce 0.4s; }
+.sorting-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 350px; margin: 0 auto; }
+.sorting-item { padding: 16px; border-radius: var(--radius-sm); background: var(--surface); border: 2px solid var(--surface2); font-size: 2rem; cursor: pointer; transition: 0.3s; }
+.sorting-item:hover { border-color: var(--accent); transform: scale(1.05); }
+.sorting-item.placed { opacity: 0.3; pointer-events: none; }
+.sorting-dropzone { min-height: 60px; border: 3px dashed var(--surface2); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; gap: 10px; padding: 10px; margin: 8px 0; transition: 0.3s; }
+.sorting-dropzone.drag-over { border-color: var(--accent); background: rgba(108,99,255,0.1); }
+
+/* ═══════ QUESTS OVERLAY ═══════ */
+.quests-btn { position: relative; }
+.quests-badge { position: absolute; top: -4px; right: -4px; background: var(--accent2); color: #fff; font-size: 0.65rem; padding: 1px 6px; border-radius: 10px; font-weight: 700; }
+.quests-overlay { position: fixed; inset: 0; z-index: 35; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; }
+.quests-overlay.show { display: flex; }
+.quests-panel { background: var(--surface); border-radius: var(--radius); padding: 28px; max-width: 480px; width: 92%; max-height: 80vh; overflow-y: auto; }
+.quests-panel h2 { font-size: 1.2rem; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+.quest-item { padding: 14px; background: var(--surface2); border-radius: var(--radius-sm); margin-bottom: 10px; display: flex; align-items: center; gap: 14px; }
+.quest-item .q-icon { font-size: 1.8rem; }
+.quest-item .q-info { flex: 1; }
+.quest-item .q-title { font-weight: 700; font-size: 0.95rem; }
+.quest-item .q-desc { color: var(--text2); font-size: 0.8rem; margin-top: 2px; }
+.quest-item .q-progress { height: 4px; background: var(--bg); border-radius: 4px; margin-top: 6px; overflow: hidden; }
+.quest-item .q-fill { height: 100%; background: linear-gradient(90deg, var(--accent4), var(--accent2)); border-radius: 4px; transition: width 0.5s; }
+.quest-item .q-reward { color: var(--accent4); font-weight: 700; font-size: 0.85rem; }
+.quest-item.completed { opacity: 0.6; }
+.quest-item.completed .q-icon { filter: grayscale(1); }
+
+/* ═══════ ACHIEVEMENTS ═══════ */
+.achievement-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 8px; margin-top: 10px; }
+.achievement-badge { text-align: center; padding: 8px; border-radius: var(--radius-sm); background: var(--surface2); transition: 0.3s; position: relative; }
+.achievement-badge .a-icon { font-size: 1.5rem; display: block; }
+.achievement-badge .a-label { font-size: 0.6rem; color: var(--text2); margin-top: 2px; }
+.achievement-badge.locked { opacity: 0.3; filter: grayscale(1); }
+
+/* ═══════ LEARNING PATH ═══════ */
+.milestone-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-top: 10px; }
+.milestone-item { padding: 10px; border-radius: var(--radius-sm); background: var(--surface2); text-align: center; border: 2px solid transparent; transition: 0.3s; }
+.milestone-item .m-icon { font-size: 1.3rem; display: block; margin-bottom: 4px; }
+.milestone-item .m-label { font-size: 0.75rem; color: var(--text2); }
+.milestone-item.completed { border-color: var(--accent3); background: rgba(69,214,192,0.1); }
+.milestone-item.completed .m-label { color: var(--accent3); }
 
 /* ═══════ GAME PANEL ═══════ */
 .game-panel { position: fixed; inset: 0; z-index: 20; display: none; flex-direction: column; background: var(--bg); }
@@ -310,6 +367,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Segoe UI
     <div class="header-right">
       <div class="header-xp"><span class="star">⭐</span> <span id="hdr-total-xp">0</span> XP</div>
       <div class="header-clock" id="hdr-clock">12:00</div>
+      <button class="header-btn quests-btn" onclick="showQuests()" title="Quests">🎯 <span class="quests-badge" id="quests-badge">!</span></button>
       <button class="header-btn" onclick="showParentDashboard()" title="Parents">🔒</button>
     </div>
   </div>
@@ -344,6 +402,11 @@ html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Segoe UI
   <div class="sub" id="score-sub">Keep it up!</div>
   <div class="xp-gain" id="score-xp">+10 XP</div>
   <button class="close-btn" onclick="closeScorePopup()">Awesome!</button>
+</div>
+
+<!-- ═══════ QUESTS OVERLAY ═══════ -->
+<div class="quests-overlay" id="quests-overlay" onclick="if(event.target===this)closeQuests()">
+  <div class="quests-panel" id="quests-panel"></div>
 </div>
 
 <!-- ═══════ NEW PROFILE MODAL ═══════ -->
@@ -523,6 +586,10 @@ var APPS = [
   { id: 'reading', icon: '📖', label: 'Story Time', game: 'reading', cls: 'reading', xp: 'Reading', desc: 'Read fun stories!' },
   { id: 'typing', icon: '⌨️', label: 'Typing', game: 'typing', cls: 'typing', xp: 'Typing', desc: 'Learn to type!' },
   { id: 'logic', icon: '🤔', label: 'Brain Teasers', game: 'logic', cls: 'logic', xp: 'Logic', desc: 'Solve fun puzzles!' },
+  { id: 'phonics', icon: '🔤', label: 'Phonics', game: 'phonics', cls: 'phonics', xp: 'Reading', desc: 'Learn letter sounds!' },
+  { id: 'colours', icon: '🌈', label: 'Colour Fun', game: 'colours', cls: 'colours', xp: 'Creativity', desc: 'Learn your colours!' },
+  { id: 'music', icon: '🎵', label: 'Music Maker', game: 'music', cls: 'music', xp: 'Creativity', desc: 'Make fun sounds!' },
+  { id: 'sorting', icon: '📦', label: 'Sort It Out', game: 'sorting', cls: 'sorting', xp: 'Logic', desc: 'Sort things by size!' },
 ];
 
 function loadApps() {
@@ -945,7 +1012,334 @@ GAMES.typing = { init: function(area) { this.start(area); }, words: ['cat','dog'
   }
 }};
 
-/* ═══════ GAME: LOGIC ═══════ */
+/* ═══════ GAME: PHONICS ═══════ */
+GAMES.phonics = { init: function(area) { this.start(area); }, start: function(area) {
+  var letters = [
+    { l: 'A', s: 'Apple 🍎' }, { l: 'B', s: 'Ball ⚽' }, { l: 'C', s: 'Cat 🐱' },
+    { l: 'D', s: 'Dog 🐶' }, { l: 'E', s: 'Egg 🥚' }, { l: 'F', s: 'Fish 🐟' },
+    { l: 'G', s: 'Grapes 🍇' }, { l: 'H', s: 'Hat 🎩' }, { l: 'I', s: 'Ice 🧊' },
+    { l: 'J', s: 'Jump 🤸' }, { l: 'K', s: 'Kite 🪁' }, { l: 'L', s: 'Lion 🦁' },
+  ];
+  var pick = letters[Math.floor(Math.random() * letters.length)];
+  var wrongs = letters.filter(function(l) { return l.l !== pick.l; }).sort(function() { return Math.random() - 0.5; }).slice(0, 3);
+  var choices = [pick].concat(wrongs).sort(function() { return Math.random() - 0.5; });
+  var html = '<div class="phonics-area"><div style="font-size:1.2rem;color:var(--text2);margin-bottom:16px;">Which letter starts the word <strong>' + pick.s + '</strong>?</div><div>';
+  choices.forEach(function(c) {
+    html += '<button class="phonics-card" data-ans="' + (c.l === pick.l ? '1' : '0') + '">' + c.l + '</button>';
+  });
+  html += '</div></div>';
+  area.innerHTML = html;
+  var self = this;
+  var answered = false;
+  area.querySelectorAll('.phonics-card').forEach(function(b) {
+    b.onclick = function() {
+      if (answered) return;
+      answered = true;
+      if (b.dataset.ans === '1') {
+        b.classList.add('correct');
+        awardXp('Reading', 20, 'Phonics: ' + pick.l, 0).then(function() {
+          showScore('🔤','Brilliant!','' + pick.l + ' is for ' + pick.s + '!', 20);
+          return questProgress('Reading');
+        });
+        setTimeout(function() { self.start(area); }, 2000);
+      } else {
+        b.classList.add('wrong');
+        setTimeout(function() { b.classList.remove('wrong'); answered = false; }, 500);
+      }
+    };
+  });
+}};
+
+/* ═══════ GAME: COLOURS ═══════ */
+GAMES.colours = { init: function(area) { this.start(area); }, start: function(area) {
+  var colours = [
+    { name: 'Red', hex: '#FF0000', emoji: '🍎' },
+    { name: 'Blue', hex: '#2196F3', emoji: '🌊' },
+    { name: 'Green', hex: '#4CAF50', emoji: '🌿' },
+    { name: 'Yellow', hex: '#FFEB3B', emoji: '🌻' },
+    { name: 'Purple', hex: '#9C27B0', emoji: '🍇' },
+    { name: 'Orange', hex: '#FF9800', emoji: '🍊' },
+  ];
+  var target = colours[Math.floor(Math.random() * colours.length)];
+  var html = '<div class="colours-area"><div style="font-size:1.3rem;color:var(--text2);margin-bottom:16px;">Find the colour: <strong>' + target.name + '</strong> ' + target.emoji + '</div><div>';
+  colours.forEach(function(c) {
+    html += '<div class="colour-swatch" style="background:' + c.hex + ';" data-ans="' + (c.name === target.name ? '1' : '0') + '" title="' + c.name + '">' + c.emoji + '</div>';
+  });
+  html += '</div></div>';
+  area.innerHTML = html;
+  var self = this;
+  var answered = false;
+  area.querySelectorAll('.colour-swatch').forEach(function(s) {
+    s.onclick = function() {
+      if (answered) return;
+      answered = true;
+      if (s.dataset.ans === '1') {
+        s.classList.add('correct');
+        awardXp('Creativity', 15, 'Colours: ' + target.name, 0).then(function() {
+          showScore('🌈','Amazing!','That\\'s ' + target.name + '!', 15);
+          return questProgress('Creativity');
+        });
+        setTimeout(function() { self.start(area); }, 1500);
+      } else {
+        s.classList.add('wrong');
+        setTimeout(function() { s.classList.remove('wrong'); answered = false; }, 500);
+      }
+    };
+  });
+}};
+
+/* ═══════ GAME: MUSIC MAKER ═══════ */
+GAMES.music = { init: function(area) {
+  var notes = ['🎵','🎶','🎷','🎸','🎺','🪘','🔔','🎹'];
+  var html = '<div class="music-area">';
+  html += '<div style="font-size:1.1rem;color:var(--text2);margin-bottom:16px;">Tap the notes to make music!</div>';
+  html += '<div>';
+  notes.forEach(function(n, i) {
+    html += '<span class="music-note" data-note="' + i + '">' + n + '</span>';
+  });
+  html += '</div>';
+  html += '<button class="drawing-submit" style="margin-top:20px;" onclick="GAMES.music.finish()">🎵 Music Finished!</button>';
+  html += '</div>';
+  area.innerHTML = html;
+  var self = this;
+  self.taps = 0;
+  area.querySelectorAll('.music-note').forEach(function(n) {
+    n.onclick = function() {
+      self.taps++;
+      n.classList.add('playing');
+      var ctx = new (window.AudioContext || window.webkitAudioContext)();
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      var freq = 261.63 * Math.pow(2, parseInt(n.dataset.note) / 12);
+      osc.frequency.value = freq;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.5);
+      setTimeout(function() { n.classList.remove('playing'); }, 400);
+    };
+  });
+}, finish: function() {
+  if (this.taps >= 3) {
+    awardXp('Creativity', 10, 'Music Maker', 0).then(function() {
+      showScore('🎵','Fun sounds!','You tapped ' + (this.taps || 3) + ' notes!', 10);
+    }.bind(this));
+  } else {
+    showScore('🎵','Tap more!','Tap at least 3 notes to earn XP!', 0);
+  }
+  this.taps = 0;
+}};
+
+/* ═══════ GAME: SORTING ═══════ */
+GAMES.sorting = { init: function(area) { this.start(area); }, start: function(area) {
+  var items = [
+    { icon: '🐭', size: 'small' }, { icon: '🐱', size: 'medium' }, { icon: '🐘', size: 'big' },
+    { icon: '🍇', size: 'small' }, { icon: '🍎', size: 'medium' }, { icon: '🍉', size: 'big' },
+  ].sort(function() { return Math.random() - 0.5; });
+  var sizes = ['small', 'medium', 'big'];
+  var labels = { small: 'Small 👶', medium: 'Medium 🧒', big: 'Big 🧔' };
+  var html = '<div class="sorting-area"><div style="font-size:1.1rem;color:var(--text2);margin-bottom:12px;">Sort by size!</div><div class="sorting-grid">';
+  items.forEach(function(it, i) {
+    html += '<div class="sorting-item" data-idx="' + i + '" data-size="' + it.size + '">' + it.icon + '</div>';
+  });
+  html += '</div><div style="margin-top:16px;">';
+  sizes.forEach(function(sz) {
+    html += '<div class="sorting-dropzone" data-size="' + sz + '">' + labels[sz] + ' <span class="drop-items"></span></div>';
+  });
+  html += '</div><button class="drawing-submit" style="margin-top:16px;" onclick="GAMES.sorting.check()">✅ Check Sorting</button></div>';
+  area.innerHTML = html;
+  this.placed = {};
+  var self = this;
+  area.querySelectorAll('.sorting-item').forEach(function(item) {
+    item.onclick = function() {
+      if (item.classList.contains('placed')) return;
+      var size = item.dataset.size;
+      var zone = area.querySelector('.sorting-dropzone[data-size="' + size + '"] .drop-items');
+      if (zone) {
+        zone.appendChild(item);
+        item.classList.add('placed');
+        self.placed[item.dataset.idx] = size;
+      }
+    };
+  });
+}, check: function() {
+  var allItems = document.querySelectorAll('.sorting-item');
+  var total = allItems.length;
+  var placed = 0;
+  allItems.forEach(function(it) {
+    var zone = it.parentElement;
+    if (zone && zone.classList.contains('drop-items')) {
+      var dropzone = zone.parentElement;
+      if (dropzone && dropzone.dataset.size === it.dataset.size) placed++;
+    } else {
+      it.classList.remove('placed');
+      document.querySelector('.sorting-grid').appendChild(it);
+    }
+  });
+  if (placed === total) {
+    awardXp('Logic', 25, 'Sorting', 0).then(function() {
+      showScore('📦','Perfect sorting!','Everything in the right place!', 25);
+      return questProgress('Logic');
+    });
+    setTimeout(function() { GAMES.sorting.start(document.getElementById('game-area')); }, 2000);
+  } else {
+    showScore('📦','Keep trying!', placed + ' of ' + total + ' correct!', 0);
+  }
+}};
+
+/* ═══════ QUESTS SYSTEM ═══════ */
+function loadQuests() {
+  api('/api/quests/' + STATE.profileId).then(function(data) {
+    var badge = document.getElementById('quests-badge');
+    if (badge) {
+      badge.textContent = data.active && data.active.length > 0 ? data.active.length : '';
+    }
+  });
+}
+
+function showQuests() {
+  var overlay = document.getElementById('quests-overlay');
+  var panel = document.getElementById('quests-panel');
+  if (!overlay || !panel) return;
+  overlay.classList.add('show');
+  panel.innerHTML = '<h2>🎯 Active Quests</h2><div style="margin-bottom:12px;"><button class="modal-btn primary" onclick="generateQuests()">🔄 New Quests</button></div><div id="quests-list">Loading...</div>';
+  renderQuests();
+}
+
+function closeQuests() {
+  document.getElementById('quests-overlay').classList.remove('show');
+}
+
+function generateQuests() {
+  api('/api/quests/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ profile_id: STATE.profileId }) }).then(function() {
+    renderQuests();
+    loadQuests();
+  });
+}
+
+function renderQuests() {
+  api('/api/quests/' + STATE.profileId).then(function(data) {
+    var list = document.getElementById('quests-list');
+    if (!list) return;
+    var html = '';
+    if (data.active && data.active.length > 0) {
+      data.active.forEach(function(q) {
+        var pct = Math.min((q.current_count / q.required_count) * 100, 100);
+        html += '<div class="quest-item"><div class="q-icon">';
+        var icons = { Math: '🔢', Reading: '📖', Logic: '🧩', Memory: '🧠', Creativity: '🎨', Typing: '⌨️' };
+        html += icons[q.skill] || '🎯';
+        html += '</div><div class="q-info"><div class="q-title">' + q.title + '</div><div class="q-desc">' + q.description + '</div><div class="q-progress"><div class="q-fill" style="width:' + pct + '%"></div></div></div><div class="q-reward">+' + q.xp_reward + '</div></div>';
+      });
+    } else {
+      html += '<div class="stat-row"><span class="stat-label">No active quests! Tap "New Quests" to start.</span></div>';
+    }
+    // Achievements section
+    api('/api/achievements/' + STATE.profileId).then(function(achs) {
+      html += '<h2 style="margin-top:20px;">🏆 Achievements</h2><div class="achievement-grid">';
+      var allAchs = ['First Quest','Star Learner','Ready for Age 6','Memory Master','Art Explorer'];
+      allAchs.forEach(function(a) {
+        var unlocked = achs && achs.some(function(x) { return x.name === a; });
+        html += '<div class="achievement-badge ' + (unlocked ? '' : 'locked') + '"><span class="a-icon">' + (unlocked ? '🌟' : '🔒') + '</span><span class="a-label">' + a + '</span></div>';
+      });
+      html += '<div style="clear:both;"></div></div>';
+      // Learning path
+      api('/api/learning-path/' + STATE.profileId).then(function(milestones) {
+        html += '<h2 style="margin-top:20px;">📚 Learning Path</h2><div class="milestone-grid">';
+        if (milestones && milestones.length) {
+          milestones.forEach(function(m) {
+            var done = m.completed === 1;
+            html += '<div class="milestone-item ' + (done ? 'completed' : '') + '"><span class="m-icon">' + (done ? '✅' : '⏳') + '</span><span class="m-label">' + m.milestone + '</span></div>';
+          });
+        }
+        html += '</div>';
+        list.innerHTML = html;
+      });
+    });
+  });
+}
+
+function questProgress(skill) {
+  return api('/api/quests/progress', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ profile_id: STATE.profileId, skill: skill })
+  }).then(function(r) {
+    if (r && r.completed) {
+      loadQuests();
+      showScore('🎯','Quest Complete!','' + r.title + ' done! +' + r.bonus + ' XP', r.bonus);
+    }
+    if (r && r.noQuest) {
+      // Try to auto-generate if none active
+      api('/api/quests/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ profile_id: STATE.profileId }) }).then(loadQuests);
+    }
+    return r;
+  });
+}
+
+/* ═══════ LITELLM ENHANCED VOICE ═══════ */
+function handleVoiceCommand(cmd) {
+  var btn = document.getElementById('voice-btn');
+  btn.classList.remove('listening');
+  btn.classList.add('processing');
+  btn.textContent = '⏳';
+  var matched = false;
+  if (cmd.indexOf('shape') >= 0 || cmd.indexOf('match') >= 0) { openGame(APPS[0]); matched = true; }
+  else if (cmd.indexOf('count') >= 0 || cmd.indexOf('number') >= 0) { openGame(APPS[1]); matched = true; }
+  else if (cmd.indexOf('pattern') >= 0) { openGame(APPS[2]); matched = true; }
+  else if (cmd.indexOf('memory') >= 0 || cmd.indexOf('remember') >= 0) { openGame(APPS[3]); matched = true; }
+  else if (cmd.indexOf('draw') >= 0 || cmd.indexOf('art') >= 0 || cmd.indexOf('paint') >= 0) { openGame(APPS[4]); matched = true; }
+  else if (cmd.indexOf('story') >= 0 || cmd.indexOf('read') >= 0) { openGame(APPS[5]); matched = true; }
+  else if (cmd.indexOf('type') >= 0 || cmd.indexOf('typing') >= 0) { openGame(APPS[6]); matched = true; }
+  else if (cmd.indexOf('brain') >= 0 || cmd.indexOf('puzzle') >= 0 || cmd.indexOf('teaser') >= 0) { openGame(APPS[7]); matched = true; }
+  else if (cmd.indexOf('phonics') >= 0 || cmd.indexOf('letter') >= 0 || cmd.indexOf('alphabet') >= 0) { openGame(APPS[8]); matched = true; }
+  else if (cmd.indexOf('colour') >= 0 || cmd.indexOf('color') >= 0 || cmd.indexOf('rainbow') >= 0) { openGame(APPS[9]); matched = true; }
+  else if (cmd.indexOf('music') >= 0 || cmd.indexOf('sound') >= 0 || cmd.indexOf('note') >= 0) { openGame(APPS[10]); matched = true; }
+  else if (cmd.indexOf('sort') >= 0 || cmd.indexOf('organize') >= 0 || cmd.indexOf('order') >= 0) { openGame(APPS[11]); matched = true; }
+  else if (cmd.indexOf('back') >= 0 || cmd.indexOf('home') >= 0 || cmd.indexOf('desktop') >= 0) { closeGame(); matched = true; }
+  else if (cmd.indexOf('parent') >= 0 || cmd.indexOf('mum') >= 0 || cmd.indexOf('dad') >= 0) { showParentDashboard(); matched = true; }
+  else if (cmd.indexOf('quest') >= 0 || cmd.indexOf('mission') >= 0 || cmd.indexOf('goal') >= 0) { showQuests(); matched = true; }
+  else if (cmd.indexOf('close') >= 0) { closeParentDashboard(); matched = true; }
+
+  if (!matched) {
+    // Try LiteLLM endpoint for complex commands
+    fetch('/api/voice/command', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: cmd, profile_id: STATE.profileId })
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      if (data.action === 'open_game') {
+        var target = APPS.filter(function(a) { return a.id === data.payload; });
+        if (target.length > 0) openGame(target[0]);
+      } else if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+        var utter = new SpeechSynthesisUtterance(data.response || 'I did not understand. Try saying shapes, counting, or stories!');
+        utter.rate = 0.85;
+        window.speechSynthesis.speak(utter);
+      }
+    }).catch(function() {
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+        var utter = new SpeechSynthesisUtterance('Try saying shapes, counting, or stories!');
+        utter.rate = 0.85;
+        window.speechSynthesis.speak(utter);
+      }
+    });
+  }
+
+  setTimeout(function() {
+    if (voiceActive) {
+      btn.classList.add('listening');
+      btn.textContent = '🎙️';
+    } else {
+      btn.textContent = '🎤';
+    }
+    btn.classList.remove('processing');
+    document.getElementById('voice-transcript').classList.remove('show');
+  }, 1000);
+}
 GAMES.logic = { init: function(area) { this.start(area); }, puzzles: [
   { q: 'Which one does NOT belong? 🍎 🍌 🐶 🍇', choices: ['🍎', '🍌', '🐶', '🍇'], correct: 2, explain: '🐶 is an animal, the rest are fruits!' },
   { q: 'What comes next? 🟡 🔵 🟡 🔵 ?', choices: ['🟡', '🔵', '🟣', '🔴'], correct: 0, explain: 'The pattern alternates yellow, blue, yellow, blue... yellow is next!' },
@@ -1111,51 +1505,10 @@ function toggleVoice() {
   }
 }
 
-function handleVoiceCommand(cmd) {
-  var btn = document.getElementById('voice-btn');
-  btn.classList.remove('listening');
-  btn.classList.add('processing');
-  btn.textContent = '⏳';
-
-  // Match commands
-  var matched = false;
-  if (cmd.indexOf('shape') >= 0 || cmd.indexOf('match') >= 0) { openGame(APPS[0]); matched = true; }
-  else if (cmd.indexOf('count') >= 0 || cmd.indexOf('number') >= 0) { openGame(APPS[1]); matched = true; }
-  else if (cmd.indexOf('pattern') >= 0) { openGame(APPS[2]); matched = true; }
-  else if (cmd.indexOf('memory') >= 0 || cmd.indexOf('remember') >= 0) { openGame(APPS[3]); matched = true; }
-  else if (cmd.indexOf('draw') >= 0 || cmd.indexOf('art') >= 0 || cmd.indexOf('paint') >= 0) { openGame(APPS[4]); matched = true; }
-  else if (cmd.indexOf('story') >= 0 || cmd.indexOf('read') >= 0) { openGame(APPS[5]); matched = true; }
-  else if (cmd.indexOf('type') >= 0 || cmd.indexOf('typing') >= 0) { openGame(APPS[6]); matched = true; }
-  else if (cmd.indexOf('brain') >= 0 || cmd.indexOf('puzzle') >= 0 || cmd.indexOf('teaser') >= 0) { openGame(APPS[7]); matched = true; }
-  else if (cmd.indexOf('back') >= 0 || cmd.indexOf('home') >= 0 || cmd.indexOf('desktop') >= 0) { closeGame(); matched = true; }
-  else if (cmd.indexOf('parent') >= 0 || cmd.indexOf('mum') >= 0 || cmd.indexOf('dad') >= 0) { showParentDashboard(); matched = true; }
-  else if (cmd.indexOf('close') >= 0) { closeParentDashboard(); matched = true; }
-
-  if (!matched) {
-    // Try to speak a response using TTS
-    if (window.speechSynthesis) {
-      window.speechSynthesis.cancel();
-      var utter = new SpeechSynthesisUtterance("I didn't understand. Try saying: shapes, counting, patterns, memory, draw, stories, typing, or brain teasers!");
-      utter.rate = 0.85;
-      window.speechSynthesis.speak(utter);
-    }
-  }
-
-  setTimeout(function() {
-    if (voiceActive) {
-      btn.classList.add('listening');
-      btn.textContent = '🎙️';
-    } else {
-      btn.textContent = '🎤';
-    }
-    btn.classList.remove('processing');
-    document.getElementById('voice-transcript').classList.remove('show');
-  }, 1000);
-}
-
 /* ═══════ INIT ═══════ */
 initVoice();
 loadProfiles();
+loadQuests();
 </script>
 </body>
 </html>
