@@ -165,11 +165,95 @@ function loadDashboard(pid) {
         <h3>🔄 Recent Activity</h3>
         ${activityHtml}
       </div>
+      <!-- V2: Economy Card -->
+      <div class="card">
+        <h3>🪙 Economy</h3>
+        <div id="eco-stats"><span style="color:#a0aec0;">Loading...</span></div>
+      </div>
+      <!-- V2: Businesses Card -->
+      <div class="card">
+        <h3>🏪 Businesses</h3>
+        <div id="biz-stats"><span style="color:#a0aec0;">Loading...</span></div>
+      </div>
+      <!-- V2: Telegram Config -->
+      <div class="card full">
+        <h3>📱 Telegram Notifications</h3>
+        <div class="setting-row">
+          <span class="stat-lbl">Chat ID</span>
+          <input class="setting-input" id="tg-chat" type="text" value="${config?.telegram_chat || ''}" style="width:200px;" placeholder="@username or chat_id">
+        </div>
+        <div class="setting-row">
+          <span class="stat-lbl">Notify on milestones</span>
+          <div class="toggle ${config?.telegram_milestones ? 'on' : ''}" id="tg-milestones" onclick="this.classList.toggle('on')"><div class="knob"></div></div>
+        </div>
+        <div class="setting-row">
+          <span class="stat-lbl">Weekly report</span>
+          <div class="toggle ${config?.telegram_weekly ? 'on' : ''}" id="tg-weekly" onclick="this.classList.toggle('on')"><div class="knob"></div></div>
+        </div>
+        <div class="setting-row">
+          <span class="stat-lbl">Screen time alerts</span>
+          <div class="toggle ${config?.telegram_alerts ? 'on' : ''}" id="tg-alerts" onclick="this.classList.toggle('on')"><div class="knob"></div></div>
+        </div>
+        <button class="btn" onclick="saveTelegramConfig()">📱 Save Telegram Config</button>
+        <button class="btn btn-secondary" onclick="testTelegram()" style="margin-left:8px;">📨 Test</button>
+      </div>
       <div class="card full">
         <h3>📅 7-Day History</h3>
         ${historyHtml}
       </div>
     `;
+
+    // Load economy and business data
+    loadEconomyStats(pid);
+    loadBusinessStats(pid);
+  });
+}
+
+function loadEconomyStats(pid) {
+  fetch('/api/economy/' + pid).then(r => r.json()).then(e => {
+    document.getElementById('eco-stats').innerHTML = `
+      <div class="stat"><span class="stat-lbl">🪙 Coins</span><span class="stat-val good">${e.coins}</span></div>
+      <div class="stat"><span class="stat-lbl">🏦 Bank</span><span class="stat-val">${e.bank}</span></div>
+      <div class="stat"><span class="stat-lbl">💰 Total Earned</span><span class="stat-val good">${e.total_earned}</span></div>
+      ${e.streak ? `<div class="stat"><span class="stat-lbl">🔥 Daily Streak</span><span class="stat-val">${e.streak} days</span></div>` : ''}
+    `;
+  }).catch(() => { document.getElementById('eco-stats').innerHTML = '<span style="color:#a0aec0;">Not available</span>'; });
+}
+
+function loadBusinessStats(pid) {
+  fetch('/api/businesses/' + pid).then(r => r.json()).then(d => {
+    const owned = d.owned || [];
+    let html = owned.length
+      ? owned.map(b => `<div class="stat"><span class="stat-lbl">${b.emoji} ${b.name}</span><span class="stat-val good">🪙${b.income}/hr</span></div>`).join('')
+      : '<div class="stat"><span class="stat-lbl">No businesses yet</span></div>';
+    html += `<div class="stat"><span class="stat-lbl">💰 Total Income</span><span class="stat-val">🪙${d.total_income || 0}/hr</span></div>`;
+    document.getElementById('biz-stats').innerHTML = html;
+  }).catch(() => { document.getElementById('biz-stats').innerHTML = '<span style="color:#a0aec0;">Not available</span>'; });
+}
+
+function saveTelegramConfig() {
+  const body = {
+    telegram_chat: document.getElementById('tg-chat').value,
+    telegram_milestones: document.getElementById('tg-milestones').classList.contains('on') ? 1 : 0,
+    telegram_weekly: document.getElementById('tg-weekly').classList.contains('on') ? 1 : 0,
+    telegram_alerts: document.getElementById('tg-alerts').classList.contains('on') ? 1 : 0
+  };
+  fetch('/api/telegram/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  }).then(() => { alert('✅ Telegram config saved!'); });
+}
+
+function testTelegram() {
+  const chat = document.getElementById('tg-chat').value;
+  if (!chat) { alert('⚠️ Enter a chat ID first'); return; }
+  fetch('/api/telegram/test', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: chat })
+  }).then(r => r.json()).then(d => {
+    alert(d.success ? '✅ Test message sent!' : '❌ Failed: ' + (d.error || 'unknown'));
   });
 }
 

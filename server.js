@@ -93,6 +93,49 @@ db.exec(`
     total_correct INTEGER DEFAULT 0,
     UNIQUE(profile_id, skill)
   );
+  CREATE TABLE IF NOT EXISTS economy (
+    profile_id INTEGER PRIMARY KEY,
+    coins INTEGER DEFAULT 100,
+    bank_balance INTEGER DEFAULT 0,
+    total_earned INTEGER DEFAULT 100,
+    total_spent INTEGER DEFAULT 0,
+    streak_days INTEGER DEFAULT 0,
+    last_login TEXT,
+    tree_stage INTEGER DEFAULT 1,
+    FOREIGN KEY (profile_id) REFERENCES profiles(id)
+  );
+  CREATE TABLE IF NOT EXISTS businesses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id INTEGER NOT NULL,
+    type TEXT NOT NULL,
+    name TEXT DEFAULT '',
+    level INTEGER DEFAULT 1,
+    profit INTEGER DEFAULT 0,
+    inventory INTEGER DEFAULT 10,
+    price INTEGER DEFAULT 5,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (profile_id) REFERENCES profiles(id)
+  );
+  CREATE TABLE IF NOT EXISTS transactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id INTEGER NOT NULL,
+    type TEXT NOT NULL,
+    amount INTEGER NOT NULL,
+    description TEXT,
+    balance_after INTEGER DEFAULT 0,
+    timestamp TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (profile_id) REFERENCES profiles(id)
+  );
+  CREATE TABLE IF NOT EXISTS parent_goals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id INTEGER,
+    title TEXT,
+    description TEXT,
+    target_coins INTEGER DEFAULT 0,
+    current_coins INTEGER DEFAULT 0,
+    completed INTEGER DEFAULT 0,
+    FOREIGN KEY (profile_id) REFERENCES profiles(id)
+  );
 `);
 
 // Seed default profile if empty
@@ -109,6 +152,14 @@ if (progressCount.c === 0) {
   skills.forEach(s => {
     db.prepare('INSERT INTO progress (profile_id, skill, level, xp, xp_to_next) VALUES (1, ?, 1, 0, 100)').run(s);
   });
+}
+
+// Seed economy + businesses for first profile
+const ecoCount = db.prepare('SELECT COUNT(*) as c FROM economy WHERE profile_id = 1').get();
+if (ecoCount.c === 0) {
+  db.prepare('INSERT INTO economy (profile_id, coins, bank_balance) VALUES (1, 100, 0)').run();
+  db.prepare('INSERT INTO businesses (profile_id, type, name, level) VALUES (1, "lemonade", "Magnolia\'s Lemonade", 1)').run();
+  db.prepare('INSERT INTO parent_goals (profile_id, title, description, target_coins) VALUES (1, "Save 500 coins", "Learn to save by putting coins in the bank!", 500)').run();
 }
 
 // API endpoints
@@ -457,6 +508,355 @@ app.post('/api/voice/command', async (req, res) => {
   }
 });
 
+// ═══════ ECONOMY API ═══════
+app.get('/api/economy/:profileId', (req, res) => {
+  let eco = db.prepare('SELECT * FROM economy WHERE profile_id = ?').get(req.params.profileId);
+  if (!eco) {
+    db.prepare('INSERT INTO economy (profile_id, coins, bank_balance) VALUES (?, 100, 0)').run(req.params.profileId);
+    eco = db.prepare('SELECT * FROM economy WHERE profile_id = ?').get(req.params.profileId);
+  }
+  // Check daily streak & bank interest
+  const today = new Date().toISOString().split('T')[0];
+  if (eco.last_login !== today) {
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    const newStreak = (eco.last_login === yesterday) ? eco.streak_days + 1 : 1;
+    const interest = Math.floor(eco.bank_balance * 0.05);
+    if (interest > 0) {
+      db.prepare('UPDATE economy SET bank_balance = bank_balance + ? WHERE profile_id = ?').run(interest, req.params.profileId);
+      logTransaction(req.params.profileId, 'interest', interest, '🌟 Bank interest earned!');
+    }
+    db.prepare('UPDATE economy SET last_login = ?, streak_days = ? WHERE profile_id = ?').run(today, newStreak, req.params.profileId);
+    eco = db.prepare('SELECT * FROM economy WHERE profile_id = ?').get(req.params.profileId);
+  }
+  // Return frontend-friendly shape
+  const can_claim = eco.last_login !== today;
+  res.json({
+    coins: eco.coins,
+    bank: eco.bank_balance,
+    total_earned: eco.total_earned || 0,
+    streak: eco.streak_days || 0,
+    can_claim: can_claim
+  });
+});
+
+function logTransaction(profileId, type, amount, description) {
+  const eco = db.prepare('SELECT coins, bank_balance FROM economy WHERE profile_id = ?').get(profileId);
+  const balance = (eco ? eco.coins + eco.bank_balance : amount);
+  db.prepare('INSERT INTO transactions (profile_id, type, amount, description, balance_after) VALUES (?, ?, ?, ?, ?)')
+    .run(profileId, type, amount, description, balance);
+}
+
+app.post('/api/economy/earn', (req, res) => {
+  const { profile_id, amount, description } = req.body;
+  db.prepare('UPDATE economy SET coins = coins + ?, total_earned = total_earned + ? WHERE profile_id = ?')
+    .run(amount, amount, profile_id);
+  logTransaction(profile_id, 'earn', amount, description || 'Activity reward');
+  const eco = db.prepare('SELECT total_earned, tree_stage FROM economy WHERE profile_id = ?').get(profile_id);
+  const newStage = Math.min(5, Math.floor(eco.total_earned / 500) + 1);
+  if (newStage > eco.tree_stage) {
+    db.prepare('UPDATE economy SET tree_stage = ? WHERE profile_id = ?').run(newStage, profile_id);
+    res.json({ success: true, coins: db.prepare('SELECT coins FROM economy WHERE profile_id = ?').get(profile_id).coins, treeGrew: true, treeStage: newStage });
+  } else {
+    res.json({ success: true, coins: eco.coins, treeGrew: false });
+  }
+});
+
+app.post('/api/economy/spend', (req, res) => {
+  const { profile_id, amount, description } = req.body;
+  const eco = db.prepare('SELECT coins FROM economy WHERE profile_id = ?').get(profile_id);
+  if (!eco || eco.coins < amount) return res.status(400).json({ error: 'Not enough coins!' });
+  db.prepare('UPDATE economy SET coins = coins - ?, total_spent = total_spent + ? WHERE profile_id = ?')
+    .run(amount, amount, profile_id);
+  logTransaction(profile_id, 'spend', amount, description || 'Purchase');
+  res.json({ success: true, coins: eco.coins - amount });
+});
+
+app.post('/api/economy/deposit', (req, res) => {
+  const { profile_id, amount } = req.body;
+  const eco = db.prepare('SELECT coins FROM economy WHERE profile_id = ?').get(profile_id);
+  if (!eco || eco.coins < amount) return res.status(400).json({ error: 'Not enough coins!' });
+  db.prepare('UPDATE economy SET coins = coins - ?, bank_balance = bank_balance + ? WHERE profile_id = ?')
+    .run(amount, amount, profile_id);
+  logTransaction(profile_id, 'deposit', amount, '🏦 Deposit to bank');
+  res.json({ success: true });
+});
+
+app.post('/api/economy/withdraw', (req, res) => {
+  const { profile_id, amount } = req.body;
+  const eco = db.prepare('SELECT bank_balance FROM economy WHERE profile_id = ?').get(profile_id);
+  if (!eco || eco.bank_balance < amount) return res.status(400).json({ error: 'Not enough in bank!' });
+  db.prepare('UPDATE economy SET coins = coins + ?, bank_balance = bank_balance - ? WHERE profile_id = ?')
+    .run(amount, amount, profile_id);
+  logTransaction(profile_id, 'withdraw', amount, '🏦 Withdraw from bank');
+  res.json({ success: true });
+});
+
+app.get('/api/transactions/:profileId', (req, res) => {
+  const txs = db.prepare('SELECT * FROM transactions WHERE profile_id = ? ORDER BY timestamp DESC LIMIT 20').all(req.params.profileId);
+  res.json(txs);
+});
+
+// ═══════ BUSINESS API ═══════
+// Businesses endpoint returns marketplace format
+app.get('/api/businesses/:profileId', (req, res) => {
+  const eco = db.prepare('SELECT coins FROM economy WHERE profile_id = ?').get(req.params.profileId) || { coins: 0 };
+  const bizDefs = [
+    { id:1, name:'Lemonade Stand', cost:50, income:5, emoji:'🍋' },
+    { id:2, name:'Cookie Shop', cost:100, income:12, emoji:'🍪' },
+    { id:3, name:'Flower Stall', cost:200, income:25, emoji:'🌸' },
+    { id:4, name:'Toy Store', cost:500, income:60, emoji:'🧸' },
+    { id:5, name:'Arcade', cost:1000, income:120, emoji:'🎮' }
+  ];
+  const owned = db.prepare('SELECT * FROM businesses WHERE profile_id = ?').all(req.params.profileId) || [];
+  const ownedNames = owned.map(b => b.name.toLowerCase());
+  const available = bizDefs.filter(b => !ownedNames.includes(b.name.toLowerCase()));
+  const totalIncome = owned.reduce((sum, b) => sum + (b.profit > 0 ? Math.floor(b.profit/10) : 0), 0);
+  res.json({ coins: eco.coins, available, owned, total_income: totalIncome });
+});
+
+app.post('/api/businesses/run', (req, res) => {
+  const { business_id, profile_id } = req.body;
+  const biz = db.prepare('SELECT * FROM businesses WHERE id = ? AND profile_id = ?').get(business_id, profile_id);
+  if (!biz) return res.status(404).json({ error: 'Business not found' });
+  
+  const weather = Math.random();
+  const demand = weather > 0.7 ? 'hot' : (weather > 0.3 ? 'normal' : 'rainy');
+  const demandMultiplier = demand === 'hot' ? 1.5 : (demand === 'rainy' ? 0.5 : 1.0);
+  
+  const customers = Math.floor((3 + biz.level * 2) * demandMultiplier);
+  const sold = Math.min(customers, biz.inventory);
+  const revenue = sold * biz.price;
+  const cost = Math.floor(sold * 2);
+  const profit = revenue - cost;
+  
+  db.prepare('UPDATE businesses SET inventory = inventory - ?, profit = profit + ? WHERE id = ?')
+    .run(sold, profit, business_id);
+  if (profit > 0) {
+    db.prepare('UPDATE economy SET coins = coins + ?, total_earned = total_earned + ? WHERE profile_id = ?')
+      .run(profit, profit, profile_id);
+    logTransaction(profile_id, 'earn', profit, '🏪 ' + biz.name + ' profit!');
+  }
+  
+  res.json({
+    sold, customers, revenue, profit,
+    weather: demand,
+    remaining_inventory: biz.inventory - sold,
+    price: biz.price,
+    level: biz.level
+  });
+});
+
+app.post('/api/businesses/buy-supplies', (req, res) => {
+  const { business_id, profile_id, amount } = req.body;
+  const cost = amount * 3;
+  const eco = db.prepare('SELECT coins FROM economy WHERE profile_id = ?').get(profile_id);
+  if (!eco || eco.coins < cost) return res.status(400).json({ error: 'Not enough coins for supplies!' });
+  const bizName = db.prepare('SELECT name FROM businesses WHERE id = ?').get(business_id).name;
+  db.prepare('UPDATE economy SET coins = coins - ?, total_spent = total_spent + ? WHERE profile_id = ?')
+    .run(cost, cost, profile_id);
+  db.prepare('UPDATE businesses SET inventory = inventory + ? WHERE id = ?').run(amount, business_id);
+  logTransaction(profile_id, 'spend', cost, '📦 Supplies for ' + bizName);
+  res.json({ success: true, newInventory: db.prepare('SELECT inventory FROM businesses WHERE id = ?').get(business_id).inventory });
+});
+
+app.post('/api/businesses/set-price', (req, res) => {
+  const { business_id, profile_id, price } = req.body;
+  db.prepare('UPDATE businesses SET price = ? WHERE id = ? AND profile_id = ?').run(price, business_id, profile_id);
+  res.json({ success: true });
+});
+
+// ═══════ CRYPTO MINING API ═══════
+app.get('/api/crypto/mine/:profileId', (req, res) => {
+  const a = Math.floor(Math.random() * 10) + 1;
+  const b = Math.floor(Math.random() * 10) + 1;
+  const ops = ['+', '-'];
+  const op = ops[Math.floor(Math.random() * 2)];
+  const answer = op === '+' ? a + b : Math.max(a, b) - Math.min(a, b);
+  const question = op === '+' ? `${a} + ${b}` : `${Math.max(a, b)} - ${Math.min(a, b)}`;
+  res.json({ question, answer, blockReward: 5 });
+});
+
+app.post('/api/crypto/claim', (req, res) => {
+  const { profile_id, correct } = req.body;
+  if (correct) {
+    const reward = 5;
+    db.prepare('UPDATE economy SET coins = coins + ?, total_earned = total_earned + ? WHERE profile_id = ?')
+      .run(reward, reward, profile_id);
+    logTransaction(profile_id, 'earn', reward, '⛏️ Mined a crypto block!');
+    res.json({ success: true, reward });
+  } else {
+    res.json({ success: false, message: 'Try again!' });
+  }
+});
+
+// ═══════ DAILY REWARD API ═══════
+app.post('/api/daily-reward/claim', (req, res) => {
+  const { profile_id } = req.body;
+  const eco = db.prepare('SELECT * FROM economy WHERE profile_id = ?').get(profile_id);
+  if (!eco) return res.status(404).json({ error: 'Profile not found' });
+  
+  const today = new Date().toISOString().split('T')[0];
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+  
+  if (eco.last_login === today) return res.json({ alreadyClaimed: true, streak: eco.streak_days });
+  
+  const newStreak = (eco.last_login === yesterday) ? eco.streak_days + 1 : 1;
+  const bonusDay = newStreak % 7 === 0;
+  const baseReward = 10 + (newStreak * 2);
+  const streakReward = bonusDay ? baseReward * 3 : baseReward;
+  
+  db.prepare('UPDATE economy SET coins = coins + ?, last_login = ?, streak_days = ? WHERE profile_id = ?')
+    .run(streakReward, today, newStreak, profile_id);
+  logTransaction(profile_id, 'earn', streakReward, '📅 Day ' + newStreak + ' reward!');
+  
+  res.json({
+    streak: newStreak,
+    reward: streakReward,
+    bonusDay,
+    message: bonusDay ? '🎉 DAY ' + newStreak + ' BONUS! Triple rewards!' : 'Day ' + newStreak + ' streak!'
+  });
+});
+
+// ═══════ PARENT GOALS API ═══════
+app.get('/api/parent-goals/:profileId', (req, res) => {
+  let goals = db.prepare('SELECT * FROM parent_goals WHERE profile_id = ? ORDER BY id').all(req.params.profileId);
+  const eco = db.prepare('SELECT bank_balance FROM economy WHERE profile_id = ?').get(req.params.profileId);
+  goals.forEach(g => {
+    g.current_coins = eco ? Math.min(eco.bank_balance, g.target_coins) : 0;
+    if (g.current_coins >= g.target_coins && !g.completed) {
+      db.prepare('UPDATE parent_goals SET completed = 1 WHERE id = ?').run(g.id);
+      g.completed = 1;
+    }
+  });
+  res.json(goals);
+});
+
+app.post('/api/parent-goals/create', (req, res) => {
+  const { profile_id, title, description, target_coins } = req.body;
+  db.prepare('INSERT INTO parent_goals (profile_id, title, description, target_coins) VALUES (?, ?, ?, ?)').run(profile_id, title, description, target_coins);
+  res.json({ success: true });
+});
+
+// ═══════ TELEGRAM NOTIFICATION API ═══════
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '';
+
+app.post('/api/notify/parent', async (req, res) => {
+  const { profile_id, message } = req.body;
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
+    return res.json({ sent: false, error: 'Telegram not configured' });
+  }
+  const profile = db.prepare('SELECT name FROM profiles WHERE id = ?').get(profile_id);
+  const name = profile ? profile.name : 'Your child';
+  try {
+    const tgResp = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: TELEGRAM_CHAT_ID,
+        text: `🌟 *${name}* ${message}`,
+        parse_mode: 'Markdown'
+      })
+    });
+    if (!tgResp.ok) {
+      const errText = await tgResp.text();
+      console.error('Telegram API error:', errText);
+      return res.json({ sent: false, error: errText });
+    }
+    res.json({ sent: true });
+  } catch (e) {
+    console.error('Telegram send failed:', e.message);
+    res.json({ sent: false, error: e.message });
+  }
+});
+
+// ═══════ PARENT WEEKLY REPORT API ═══════
+app.get('/api/parent-report/:profileId', (req, res) => {
+  const profile = db.prepare('SELECT * FROM profiles WHERE id = ?').get(req.params.profileId);
+  const eco = db.prepare('SELECT * FROM economy WHERE profile_id = ?').get(req.params.profileId);
+  const today = db.prepare('SELECT COALESCE(SUM(duration_seconds),0) as time, COALESCE(SUM(xp_earned),0) as xp FROM activity_log WHERE profile_id = ? AND date(timestamp) = date("now")').get(req.params.profileId);
+  const week = db.prepare('SELECT COALESCE(SUM(duration_seconds),0) as time, COALESCE(SUM(xp_earned),0) as xp FROM activity_log WHERE profile_id = ? AND timestamp >= datetime("now", "-7 days")').get(req.params.profileId);
+  const biz = db.prepare('SELECT COUNT(*) as count FROM businesses WHERE profile_id = ?').get(req.params.profileId);
+  const bizProfit = db.prepare('SELECT COALESCE(SUM(profit),0) as total FROM businesses WHERE profile_id = ?').get(req.params.profileId);
+  res.json({ profile, economy: eco, today, week, businesses: biz.count, totalProfit: bizProfit.total });
+});
+
+// ═══════ FRONTEND V2 ALIASES ═══════
+
+// Daily status endpoint (frontend calls /api/daily/:profileId)
+app.get('/api/daily/:profileId', (req, res) => {
+  const eco = db.prepare('SELECT last_login, streak_days, coins, bank_balance, total_earned FROM economy WHERE profile_id = ?').get(req.params.profileId);
+  if (!eco) return res.json({ can_claim: true, streak: 0 });
+  const today = new Date().toISOString().split('T')[0];
+  res.json({ can_claim: eco.last_login !== today, streak: eco.streak_days || 0 });
+});
+
+// Daily claim alias
+app.post('/api/daily/claim', (req, res) => {
+  req.body.profile_id = req.body.profile_id || STATE.profileId || 1;
+  app._router.handle({method:'post', url:'/api/daily-reward/claim', body: req.body}, res, function(){});
+});
+
+// Economy reward alias (frontend sends coins instead of amount)
+app.post('/api/economy/reward', (req, res) => {
+  const { profile_id, coins, description } = req.body;
+  const amount = coins || 0;
+  if (!profile_id || !amount) return res.json({ success: false, error: 'Missing fields' });
+  db.prepare('UPDATE economy SET coins = coins + ?, total_earned = total_earned + ? WHERE profile_id = ?').run(amount, amount, profile_id);
+  logTransaction(profile_id, 'earn', amount, description || '🏆 Reward');
+  res.json({ success: true, coins: db.prepare('SELECT coins FROM economy WHERE profile_id = ?').get(profile_id).coins });
+});
+
+// Business buy route (frontend calls /api/businesses/buy)
+app.post('/api/businesses/buy', (req, res) => {
+  const { profile_id, business_id } = req.body;
+  if (!profile_id) return res.status(400).json({ success: false, error: 'profile_id required' });
+  const eco = db.prepare('SELECT coins FROM economy WHERE profile_id = ?').get(profile_id);
+  const bizDefs = [
+    { id:1, name:'Lemonade Stand', cost:50, income:5, emoji:'🍋' },
+    { id:2, name:'Cookie Shop', cost:100, income:12, emoji:'🍪' },
+    { id:3, name:'Flower Stall', cost:200, income:25, emoji:'🌸' },
+    { id:4, name:'Toy Store', cost:500, income:60, emoji:'🧸' },
+    { id:5, name:'Arcade', cost:1000, income:120, emoji:'🎮' }
+  ];
+  const bizDef = bizDefs.find(b => b.id === business_id);
+  if (!bizDef) return res.json({ success: false, error: 'Invalid business' });
+  if (!eco || eco.coins < bizDef.cost) return res.json({ success: false, error: 'Not enough coins' });
+  db.prepare('UPDATE economy SET coins = coins - ? WHERE profile_id = ?').run(bizDef.cost, profile_id);
+  logTransaction(profile_id, 'spend', bizDef.cost, '🏪 Bought ' + bizDef.name);
+  db.prepare('INSERT INTO businesses (profile_id, type, name, level, price, inventory, profit) VALUES (?, ?, ?, 1, 5, 10, 0)').run(profile_id, bizDef.name.toLowerCase().replace(/ /g,'_'), bizDef.name);
+  res.json({ success: true, name: bizDef.name, income: bizDef.income });
+});
+
+// Update businesses list to return marketplace format
+
+// Telegram config persistence (in-memory for now, stored in economy)
+const tgConfigs = {};
+app.post('/api/telegram/config', (req, res) => {
+  const { telegram_chat, telegram_milestones, telegram_weekly, telegram_alerts } = req.body;
+  tgConfigs.global = { chat: telegram_chat, milestones: telegram_milestones || 0, weekly: telegram_weekly || 0, alerts: telegram_alerts || 0 };
+  res.json({ success: true });
+});
+
+app.post('/api/telegram/test', async (req, res) => {
+  const chatId = req.body.chat_id || tgConfigs.global?.chat;
+  if (!chatId) return res.json({ success: false, error: 'No chat ID' });
+  const token = process.env.TELEGRAM_BOT_TOKEN || '';
+  if (!token) return res.json({ success: false, error: 'Bot token not configured' });
+  try {
+    const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text: '🔔 Anaka Kids OS notification test!', parse_mode: 'Markdown' })
+    });
+    const ok = r.ok;
+    const data = ok ? {} : await r.text();
+    res.json({ success: ok, error: ok ? null : data });
+  } catch(e) {
+    res.json({ success: false, error: e.message });
+  }
+});
+
+// Update listen callback with Telegram config note
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
